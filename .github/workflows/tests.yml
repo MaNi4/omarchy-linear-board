@@ -1,0 +1,35 @@
+name: Tests
+
+# Every push, and every morning: Linear changes its API without versions, so
+# a daily run against its current schema says when something the board uses
+# is gone or deprecated. GitHub emails the repository owner when a run fails.
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+      # With a LINEAR_API_KEY secret, also against the live API's own schema
+      # (the published one can lag behind).
+      - name: Live schema
+        if: ${{ env.LINEAR_API_KEY != '' }}
+        env:
+          LINEAR_SCHEMA: live
+        run: node tests/api.test.js

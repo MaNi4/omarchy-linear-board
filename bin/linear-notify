@@ -1,0 +1,46 @@
+#!/usr/bin/env python3
+"""Send a desktop notification over D-Bus for the Linear board.
+
+The notification is read as one JSON object on stdin, so issue titles and
+inbox text never show up in process listings (as they would with
+notify-send arguments):
+
+  {"title": "...", "body": "...", "urgency": 1, "glyph": "...",
+   "exec": ["omarchy-shell", "shell", "summon", "<plugin id>", "<payload>"]}
+
+"exec" is the click action: Omarchy's notifications run it (as an argv, never
+through a shell) when the notification is clicked, also later from the
+notification history. The notification id is printed.
+"""
+import json
+import sys
+
+
+def main():
+    try:
+        note = json.load(sys.stdin)
+    except ValueError:
+        return 2
+    from gi.repository import Gio, GLib
+
+    hints = {"urgency": GLib.Variant("y", max(0, min(2, int(note.get("urgency", 1)))))}
+    argv = note.get("exec")
+    if isinstance(argv, list) and argv and all(isinstance(a, str) for a in argv):
+        hints["omarchy-exec-argv"] = GLib.Variant("s", json.dumps(argv))
+    if note.get("glyph"):
+        hints["omarchy-glyph"] = GLib.Variant("s", str(note["glyph"]))
+    # Only the body is read as markup; Linear titles often hold "<" (error names).
+    body = str(note.get("body", "")).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    params = GLib.Variant("(susssasa{sv}i)", (
+        str(note.get("app") or "Linear"), int(note.get("replaces", 0)), "", str(note.get("title", "Linear")),
+        body, [], hints, int(note.get("timeout", -1))))
+    bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+    reply = bus.call_sync("org.freedesktop.Notifications", "/org/freedesktop/Notifications",
+                          "org.freedesktop.Notifications", "Notify", params, GLib.VariantType("(u)"),
+                          Gio.DBusCallFlags.NONE, 3000, None)
+    print(reply.unpack()[0])
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

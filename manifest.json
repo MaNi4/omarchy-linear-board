@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "mani4.linear-board",
+  "name": "Linear Board",
+  "version": "0.15.1",
+  "author": "MaNi4",
+  "license": "MIT",
+  "homepage": "https://github.com/MaNi4/omarchy-linear-board",
+  "description": "Kanban board window for Linear: issues by workflow state, drag and drop between columns, labels, projects, assignees, due dates, estimates, cycles (editing them too), sub-issues, comments, the trash and the Linear inbox, with an unread count in the bar",
+  "kinds": [
+    "overlay",
+    "bar-widget",
+    "service"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "overlay": "Board.qml",
+    "barWidget": "BarWidget.qml",
+    "service": "Service.qml"
+  },
+  "barWidget": {
+    "displayName": "Linear inbox",
+    "description": "Unread Linear notifications; click for the inbox, right click for the board",
+    "category": "Development",
+    "aliases": [
+      "linear",
+      "inbox",
+      "issues",
+      "kanban"
+    ],
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}
