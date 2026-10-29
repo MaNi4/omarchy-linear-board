@@ -162,7 +162,7 @@ Item {
     border.color: Util.alpha(root.fg, 0.25)
     MouseArea { anchors.fill: parent }
 
-    QQC.TextField {
+    TextBox {
       id: searchBox
       anchors.left: parent.left
       anchors.right: parent.right
@@ -174,7 +174,8 @@ Item {
       selectionColor: Util.alpha(root.accent, 0.35)
       font.family: root.font
       font.pixelSize: Style.font.bodySmall
-      leftPadding: Style.spacing.md
+      padLeft: Style.spacing.md
+      padRight: Style.spacing.md
       background: Rectangle { radius: root.radius; color: Util.alpha(root.fg, 0.05) }
       onTextChanged: { menu.query = text; menu.cursor = 0 }
       Keys.onDownPressed: function(event) { menu.cursor = Math.min(menu.items.length - 1, menu.cursor + 1); list.positionViewAtIndex(menu.cursor, ListView.Contain); event.accepted = true }

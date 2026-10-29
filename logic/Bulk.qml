@@ -158,7 +158,8 @@ Item {
     if (!issue) { notices.notify("Select a card first."); return }
     var text = Issues.copyText(issue, kind)
     if (!text) { notices.notify("Nothing to copy (reload the board)."); return }
-    Quickshell.execDetached(["wl-copy", "--", text])
+    copyProc.text = text
+    copyProc.running = true
     var what = { id: "ID", branch: "git branch", url: "link", markdown: "Markdown link", title: "ID and title" }[kind] || ""
     notices.notify("Copied " + what + ": " + text, false, root.icon.check)
   }
@@ -350,5 +351,15 @@ Item {
       boardScreen.boardFlick.contentX = Math.max(0, Math.min(max, boardScreen.boardFlick.contentX + step))
       bulk.updateDrag(bulk.dragPoint)
     }
+  }
+
+  // The text goes to wl-copy on stdin, not in its arguments.
+  Process {
+    id: copyProc
+    property string text: ""
+    command: ["wl-copy"]
+    stdinEnabled: true
+    onStarted: { copyProc.write(copyProc.text); copyProc.text = ""; stdinEnabled = false }
+    onExited: stdinEnabled = true
   }
 }

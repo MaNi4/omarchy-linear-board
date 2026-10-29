@@ -134,7 +134,7 @@ Rectangle {
       SectionTitle { text: "Target date" }
       RowLayout {
         width: parent.width
-        TextField {
+        TextBox {
           id: projTargetField
           Layout.preferredWidth: Style.space(200)
           text: projBody.pr ? projBody.pr.targetDate : ""
@@ -155,13 +155,13 @@ Rectangle {
           spacing: Style.spacing.md
           readonly property int count: root.issues.filter(function(i) { return i.milestoneId === modelData.id }).length
           Label { text: root.icon.flag; color: root.accent }
-          TextField {
+          TextBox {
             id: msName
             Layout.fillWidth: true
             text: modelData.name
             Keys.onReturnPressed: function(event) { projectOps.updateMilestone(modelData, msName.text, msDate.text); keyScope.forceActiveFocus(); event.accepted = true }
           }
-          TextField {
+          TextBox {
             id: msDate
             Layout.preferredWidth: Style.space(140)
             text: modelData.targetDate
@@ -175,13 +175,13 @@ Rectangle {
       }
       RowLayout {
         width: parent.width
-        TextField {
+        TextBox {
           id: newMsName
           Layout.fillWidth: true
           placeholderText: "New milestone, e.g. Launch"
           Keys.onReturnPressed: function(event) { if (projectOps.addMilestone(newMsName.text, newMsDate.text)) { newMsName.text = ""; newMsDate.text = "" } event.accepted = true }
         }
-        TextField {
+        TextBox {
           id: newMsDate
           Layout.preferredWidth: Style.space(140)
           placeholderText: "Target date"
@@ -208,10 +208,16 @@ Rectangle {
         }
       }
       QQC.ScrollView {
+        id: projUpdateScroll
         width: parent.width
         height: Style.space(90)
-        QQC.TextArea {
+        TextBox {
           id: projUpdateField
+          multiline: true
+          imagePaste: true
+          flickable: projUpdateScroll.contentItem
+          width: projUpdateScroll.availableWidth
+          height: Math.max(implicitHeight, projUpdateScroll.availableHeight)
           placeholderText: projectOps.projectEditUpdateId ? "Edit your update (Ctrl+Enter saves, Esc cancels)" : "What changed since the last update? (Markdown; Ctrl+Enter posts)"
           wrapMode: TextEdit.Wrap
           color: root.fg
@@ -219,7 +225,10 @@ Rectangle {
           selectionColor: Util.alpha(root.accent, 0.35)
           font.family: root.font
           font.pixelSize: Style.font.body
-          padding: Style.spacing.lg
+          padLeft: Style.spacing.lg
+          padRight: Style.spacing.lg
+          topPadding: Style.spacing.lg
+          bottomPadding: Style.spacing.lg
           background: Rectangle {
             radius: root.radius
             color: Util.alpha(root.fg, 0.04)
@@ -251,9 +260,6 @@ Rectangle {
               event.accepted = true
             } else if (event.key === Qt.Key_Escape && projectOps.projectEditUpdateId) {
               projectOps.cancelProjectUpdateEdit()
-              event.accepted = true
-            } else if (event.key === Qt.Key_V && (event.modifiers & Qt.ControlModifier) && !(event.modifiers & Qt.ShiftModifier)) {
-              uploads.pasteInto(projUpdateField)
               event.accepted = true
             } else if (editorOps.markdownKey(projUpdateField, event)) event.accepted = true
           }

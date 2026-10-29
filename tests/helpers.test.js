@@ -172,7 +172,15 @@ assert.strictEqual(L.displayMarkdown("[x](https://linear.app/acme/profiles/ann)"
 assert.strictEqual(L.displayMarkdown("hi https://linear.app/acme/profiles/ann and [docs](https://d.io/a)", "#ffcc00"),
   'hi <a href="https://linear.app/acme/profiles/ann" style="text-decoration:none"><span style="color:#ffcc00"><b>@ann</b></span></a>' +
   ' and <a href="https://d.io/a"><span style="color:#ffcc00">docs</span></a>')
-assert.strictEqual(L.displayMarkdown("see https://x.io/a<b>", "#fff"), 'see <a href="https://x.io/a"><span style="color:#fff">https://x.io/a</span></a><b>')
+assert.strictEqual(L.displayMarkdown("see https://x.io/a<b>", "#fff"), 'see <a href="https://x.io/a"><span style="color:#fff">https://x.io/a</span></a>&lt;b>')
+// Raw HTML from issue text is shown as text, code is left alone.
+assert.strictEqual(L.displayMarkdown('<img src="http://t.io/p.gif"> a < b'), '&lt;img src="http://t.io/p.gif"> a < b')
+assert.strictEqual(L.displayMarkdown("use `<div>` here"), "use `<div>` here")
+assert.strictEqual(L.displayMarkdown("```\n<b>x</b>\n```\n<b>y</b>"), "```\n<b>x</b>\n```\n&lt;b>y&lt;/b>")
+assert.strictEqual(L.displayMarkdown("<https://x.io/a>"), "https://x.io/a")
+assert.strictEqual(L.displayMarkdown("[a <i>b</i> & c](https://x.io)", "#fff"), '<a href="https://x.io"><span style="color:#fff">a &lt;i&gt;b&lt;/i&gt; &amp; c</span></a>')
+assert.ok(L.openable("https://linear.app/x") && L.openable("mailto:a@b.c") && L.openable("HTTP://x.io"))
+assert.ok(!L.openable("file:///etc/passwd") && !L.openable("-x") && !L.openable("javascript:alert(1)") && !L.openable("https://a b") && !L.openable(""))
 assert.deepStrictEqual(plain(L.mentionQuery("hi @ma", 6)), { query: "ma", start: 3 })
 assert.strictEqual(L.mentionQuery("mail@x", 6), null)
 assert.deepStrictEqual(plain(L.mentionMatches([{ name: "ann", fullName: "Ann Lee", url: "u" }, { name: "eva", fullName: "Eva", url: "v" }], "an").map(m => m.name)), ["ann"])

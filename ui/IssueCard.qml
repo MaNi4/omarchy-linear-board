@@ -58,16 +58,23 @@ Item {
 
   height: cardBody.y + cardBody.height
 
-  Label {
+  // The label keeps its own height: sized from its implicitHeight, an
+  // elided Text lays out again and changes it (a binding loop).
+  Item {
     id: groupHead
     visible: cardItem.groupStart
     width: parent.width
-    height: visible ? implicitHeight + Style.spacing.md : 0
-    text: cardItem.grp ? cardItem.grp.label : ""
-    font.pixelSize: Style.font.caption
-    font.bold: true
-    opacity: 0.6
-    verticalAlignment: Text.AlignBottom
+    height: visible ? groupLabel.implicitHeight + Style.spacing.md : 0
+    Label {
+      id: groupLabel
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      text: cardItem.grp ? cardItem.grp.label : ""
+      font.pixelSize: Style.font.caption
+      font.bold: true
+      opacity: 0.6
+    }
   }
 
   Rectangle {

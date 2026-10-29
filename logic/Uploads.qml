@@ -45,7 +45,7 @@ Item {
     // The file name: the URL without its scheme, made safe.
     var name = url.replace(/^https?:\/\//, "").replace(/[?#].*$/, "").replace(/[^A-Za-z0-9._-]+/g, "_").slice(-150)
     imageProc.command = ["sh", "-c", 'umask 077; d="$2/images"; mkdir -p "$d"; f="$d/$3"; ' +
-      'if [ ! -s "$f" ]; then case "$1" in https://uploads.linear.app/*) curl -sSfL -H "Authorization: $LINEAR_KEY" -o "$f.part" -- "$1";; ' +
+      'if [ ! -s "$f" ]; then case "$1" in https://uploads.linear.app/*) curl -sSfL --max-filesize 20000000 -H "Authorization: $LINEAR_KEY" -o "$f.part" -- "$1";; ' +
       '*) curl -sSfL --max-filesize 20000000 -o "$f.part" -- "$1";; esac && mv "$f.part" "$f" || { rm -f "$f.part"; exit 1; }; fi; ' +
       'case "$(file -b --mime-type -- "$f")" in image/*) ;; *) exit 3;; esac; ' +
       'printf "%s\n%s\n" "$f" "$(file -b -- "$f")"', "sh", url, root.cacheDir, name]
@@ -168,14 +168,17 @@ Item {
   }
   Process {
     id: pasteProc
-    command: ["sh", "-c", 't=$(wl-paste --list-types 2>/dev/null | grep -m1 -xE "image/(png|jpeg|gif|webp)") || { echo none; exit 0; }; ' +
-      'f="$1/paste-$(date +%s%N).${t#image/}"; wl-paste -t "$t" > "$f" && printf "%s %s %s\\n" "$t" "$(stat -c %s "$f")" "$f"', "sh", root.cacheDir]
+    // At most maxPaste bytes are read; a bigger image is not uploaded.
+    command: ["sh", "-c", 'umask 077; t=$(timeout 2 wl-paste --list-types 2>/dev/null | head -c 4096 | grep -m1 -xE "image/(png|jpeg|gif|webp)") || { echo none; exit 0; }; ' +
+      'f="$1/paste-$(date +%s%N).${t#image/}"; timeout 10 wl-paste -t "$t" | head -c "$(($2 + 1))" > "$f" || { rm -f -- "$f"; exit 1; }; ' +
+      's=$(stat -c %s -- "$f"); [ "$s" -le "$2" ] || { rm -f -- "$f"; echo big; exit 0; }; printf "%s %s %s\\n" "$t" "$s" "$f"', "sh", root.cacheDir, String(uploads.maxPaste)]
     stdout: StdioCollector { id: pasteOut }
     onExited: function(code) {
       var field = uploads.pasteField
       var out = pasteOut.text.trim()
       if (!field) return
-      if (code !== 0 || !out || out === "none") { field.paste(); return }
+      if (out === "big") { notices.notify("The image in the clipboard is bigger than " + Math.round(uploads.maxPaste / 1000000) + " MB.", true); return }
+      if (code !== 0 || !out || out === "none") { clipboard.pasteText(field); return }
       var parts = out.split(" ")
       var type = parts[0]
       uploads.queueUpload({ src: "clipboard", field: field, at: uploads.pasteAt, prepared: { type: type, size: parseInt(parts[1]),
@@ -205,9 +208,10 @@ Item {
     if (item.prepared) { uploads.uploadFile(item); return }
     var src = /^file:\/\//.test(item.src) ? decodeURIComponent(item.src.replace(/^file:\/\//, "")) : item.src
     prepareProc.command = ["sh", "-c",
-      'case "$1" in http://*|https://*) n=$(basename "${1%%[?#]*}"); f="$2/drop-$(date +%s%N)-${n:-file}"; curl -sSfL -o "$f" -- "$1" || exit 1; tmp=1;; ' +
+      'umask 077; case "$1" in http://*|https://*) n=$(basename -- "${1%%[?#]*}"); f="$2/drop-$(date +%s%N)-${n:-file}"; ' +
+      'curl -sSfL --max-filesize "$3" -o "$f" -- "$1" || { rm -f -- "$f"; exit 1; }; tmp=1;; ' +
       '*) f="$1"; tmp=0;; esac; [ -f "$f" ] || exit 2; ' +
-      'printf "%s %s %s %s\\n" "$(file -b --mime-type -- "$f")" "$(stat -c %s -- "$f")" "$tmp" "$f"', "sh", src, root.cacheDir]
+      'printf "%s %s %s %s\\n" "$(file -b --mime-type -- "$f")" "$(stat -c %s -- "$f")" "$tmp" "$f"', "sh", src, root.cacheDir, String(uploads.maxDownload)]
     prepareProc.running = true
   }
   Process {
@@ -229,20 +233,30 @@ Item {
       uploads.uploadFile(item)
     }
   }
+  readonly property int maxPaste: 20000000       // bytes of a pasted image
+  readonly property int maxDownload: 100000000   // bytes of a file dropped as a link
+
+  // A string for a curl config file (curl -K): quoted, no line breaks.
+  function curlQuote(s) {
+    return '"' + String(s).replace(/[\r\n]/g, "").replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"'
+  }
+
   function uploadFile(item) {
     var f = item.prepared
-    if (!(f.size > 0)) { notices.notify("“" + f.name + "” is empty.", true); if (f.temp) Quickshell.execDetached(["rm", "-f", f.path]); uploads.finishUpload(); return }
+    if (!(f.size > 0)) { notices.notify("“" + f.name + "” is empty.", true); if (f.temp) Quickshell.execDetached(["rm", "-f", "--", f.path]); uploads.finishUpload(); return }
     notices.notify("Uploading “" + f.name + "”…" + (uploads.uploadQueue.length > 1 ? " (" + (uploads.uploadQueue.length - 1) + " more waiting)" : ""), false, root.icon.upload)
     root.gql(Linear.M_FILE_UPLOAD, { contentType: f.type, filename: f.name, size: f.size }, function(d) {
       var up = d.fileUpload.uploadFile
-      var args = ["curl", "-sS", "-f", "-X", "PUT", "-H", "Content-Type: " + f.type, "-H", "Cache-Control: public, max-age=31536000"]
-      ;(up.headers || []).forEach(function(h) { args.push("-H", h.key + ": " + h.value) })
-      args.push("--data-binary", "@" + f.path, up.uploadUrl)
+      // The signed upload URL, its headers and the file's path go to curl
+      // as a config on stdin, not as arguments anyone can list.
+      var conf = ["header = " + uploads.curlQuote("Content-Type: " + f.type), "header = " + uploads.curlQuote("Cache-Control: public, max-age=31536000")]
+      ;(up.headers || []).forEach(function(h) { conf.push("header = " + uploads.curlQuote(h.key + ": " + h.value)) })
+      conf.push("data-binary = " + uploads.curlQuote("@" + f.path), "url = " + uploads.curlQuote(up.uploadUrl))
       uploadProc.asset = up.assetUrl
-      uploadProc.command = args
+      uploadProc.config = conf.join("\n") + "\n"
       uploadProc.running = true
     }, function(msg) {
-      if (f.temp) Quickshell.execDetached(["rm", "-f", f.path])
+      if (f.temp) Quickshell.execDetached(["rm", "-f", "--", f.path])
       notices.notify("Could not upload “" + f.name + "”: " + msg, true)
       uploads.finishUpload()
     })
@@ -250,12 +264,17 @@ Item {
   Process {
     id: uploadProc
     property string asset: ""
+    property string config: ""
+    command: ["curl", "-sS", "-f", "-X", "PUT", "-K", "-"]
+    stdinEnabled: true
+    onStarted: { uploadProc.write(uploadProc.config); uploadProc.config = ""; stdinEnabled = false }
     stderr: StdioCollector { id: uploadErr }
     onExited: function(code) {
+      stdinEnabled = true
       var item = uploads.uploadQueue[0]
       if (!item) return
       var f = item.prepared
-      if (f.temp) Quickshell.execDetached(["rm", "-f", f.path])
+      if (f.temp) Quickshell.execDetached(["rm", "-f", "--", f.path])
       if (code !== 0) { notices.notify("Could not upload “" + f.name + "”: " + (uploadErr.text.trim() || "curl failed"), true); uploads.finishUpload(); return }
       var field = item.field
       if (field) {

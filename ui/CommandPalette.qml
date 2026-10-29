@@ -26,7 +26,7 @@ Rectangle {
   border.width: 1
   border.color: Util.alpha(root.accent, 0.6)
   MouseArea { anchors.fill: parent }
-  TextField {
+  TextBox {
     id: paletteField
     anchors.left: parent.left
     anchors.right: parent.right

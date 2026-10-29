@@ -141,43 +141,43 @@ Rectangle {
       Flow {
         width: parent.width
         spacing: Style.spacing.sm
-        TextField {
+        TextBox {
           id: timeIssueField
           width: Style.space(300)
           verticalPadding: 0
-          implicitHeight: root.inlineHeight
-          verticalAlignment: TextInput.AlignVCenter
+          height: root.inlineHeight
+          verticalAlignment: TextEdit.AlignVCenter
           font.pixelSize: Style.font.bodySmall
           placeholderText: "Issue: ID or title"
           onTextChanged: if (activeFocus) { timeTracker.reportIssue = null; editorOps.updateSuggest("time", text) }
           Keys.onPressed: function(event) { if (editorOps.suggestKey(event, "time", timeIssueField)) event.accepted = true }
         }
-        TextField {
+        TextBox {
           id: timeDurField
           width: Style.space(120)
           verticalPadding: 0
-          implicitHeight: root.inlineHeight
-          verticalAlignment: TextInput.AlignVCenter
+          height: root.inlineHeight
+          verticalAlignment: TextEdit.AlignVCenter
           font.pixelSize: Style.font.bodySmall
           placeholderText: "45m, 1h 30m"
           Keys.onReturnPressed: function(event) { timeAddBtn.clicked(); event.accepted = true }
         }
-        TextField {
+        TextBox {
           id: timeDateField
           width: Style.space(120)
           verticalPadding: 0
-          implicitHeight: root.inlineHeight
-          verticalAlignment: TextInput.AlignVCenter
+          height: root.inlineHeight
+          verticalAlignment: TextEdit.AlignVCenter
           font.pixelSize: Style.font.bodySmall
           text: root.today
           Keys.onReturnPressed: function(event) { timeAddBtn.clicked(); event.accepted = true }
         }
-        TextField {
+        TextBox {
           id: timeNoteField
           width: Style.space(200)
           verticalPadding: 0
-          implicitHeight: root.inlineHeight
-          verticalAlignment: TextInput.AlignVCenter
+          height: root.inlineHeight
+          verticalAlignment: TextEdit.AlignVCenter
           font.pixelSize: Style.font.bodySmall
           placeholderText: "Note (optional)"
           Keys.onReturnPressed: function(event) { timeAddBtn.clicked(); event.accepted = true }
@@ -234,24 +234,24 @@ Rectangle {
                 width: Math.max(0, entContent.width - entWhen.width - Style.space(70) - Style.space(150) - Style.spacing.md * 3)
                 anchors.verticalCenter: parent.verticalCenter
               }
-              TextField {
+              TextBox {
                 id: entDurEdit
                 visible: entRow.editing
                 width: Style.space(100)
                 verticalPadding: 0
-                implicitHeight: root.inlineHeight
-                verticalAlignment: TextInput.AlignVCenter
+                height: root.inlineHeight
+                verticalAlignment: TextEdit.AlignVCenter
                 font.pixelSize: Style.font.bodySmall
                 text: Time.formatDuration(entRow.modelData.seconds)
                 Keys.onReturnPressed: function(event) { entSave.clicked(); event.accepted = true }
               }
-              TextField {
+              TextBox {
                 id: entNoteEdit
                 visible: entRow.editing
                 width: Math.max(Style.space(120), entContent.width - entWhen.width - entDurEdit.width - Style.space(150) - Style.spacing.md * 4)
                 verticalPadding: 0
-                implicitHeight: root.inlineHeight
-                verticalAlignment: TextInput.AlignVCenter
+                height: root.inlineHeight
+                verticalAlignment: TextEdit.AlignVCenter
                 font.pixelSize: Style.font.bodySmall
                 placeholderText: "Note"
                 text: entRow.modelData.note

@@ -102,7 +102,7 @@ Rectangle {
     anchors.topMargin: visible ? Style.spacing.lg : 0
     height: visible ? implicitHeight : 0
     spacing: Style.spacing.sm
-    TextField {
+    TextBox {
       id: binField
       visible: lists.isBin
       Layout.fillWidth: true
@@ -170,14 +170,14 @@ Rectangle {
     RowLayout {
       width: parent.width
       spacing: Style.spacing.sm
-      TextField {
+      TextBox {
         id: cycleNameField
         Layout.fillWidth: true
         placeholderText: cycleEdit.cycle ? "Name (empty: Cycle " + cycleEdit.cycle.number + ")" : "Name"
         Keys.onReturnPressed: function(event) { cycleEdit.save(); event.accepted = true }
         Keys.onEscapePressed: function(event) { cycleEdit.cancel(); event.accepted = true }
       }
-      TextField {
+      TextBox {
         id: cycleStartField
         Layout.preferredWidth: Style.space(120)
         placeholderText: "Starts"
@@ -185,7 +185,7 @@ Rectangle {
         Keys.onEscapePressed: function(event) { cycleEdit.cancel(); event.accepted = true }
       }
       Label { text: "–" }
-      TextField {
+      TextBox {
         id: cycleEndField
         Layout.preferredWidth: Style.space(120)
         placeholderText: "Ends"
@@ -193,7 +193,7 @@ Rectangle {
         Keys.onEscapePressed: function(event) { cycleEdit.cancel(); event.accepted = true }
       }
     }
-    TextField {
+    TextBox {
       id: cycleDescField
       width: parent.width
       placeholderText: "Description (optional)"

@@ -174,8 +174,8 @@ Rectangle {
   }
 
   // Values the board's logic reads and sets but that are picked from menus now.
-  TextField { id: dueField; visible: false; onTextChanged: ed.dueError = false }
-  TextField { id: newLabelField; visible: false }
+  TextBox { id: dueField; visible: false; onTextChanged: ed.dueError = false }
+  TextBox { id: newLabelField; visible: false }
 
   // ================= header =================
   // ================= header =================
@@ -220,7 +220,7 @@ Rectangle {
       }
 
       // Title: big, without a frame, like Linear.
-      QQC.TextField {
+      TextBox {
         id: titleField
         Keys.onPressed: function(event) { keyboard.altMenu(event) }
         width: parent.width
@@ -231,8 +231,8 @@ Rectangle {
         font.family: root.font
         font.pixelSize: Style.font.heading + 2
         font.bold: true
-        leftPadding: 0
-        rightPadding: 0
+        padLeft: 0
+        padRight: 0
         background: Rectangle {
           color: "transparent"
           Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: Math.max(1, Style.space(2)); color: root.urgent; visible: ed.titleError }
@@ -286,11 +286,17 @@ Rectangle {
       }
 
       QQC.ScrollView {
+        id: descScroll
         visible: !ed.descPreview
         width: parent.width
         height: Math.max(editor.editing ? Style.space(140) : Style.space(110), Math.min(Style.space(380), descField.implicitHeight))
-        QQC.TextArea {
+        TextBox {
           id: descField
+          multiline: true
+          imagePaste: true
+          flickable: descScroll.contentItem
+          width: descScroll.availableWidth
+          height: Math.max(implicitHeight, descScroll.availableHeight)
           placeholderText: "Add a description…  (Markdown; paste or drop images and files)"
           wrapMode: TextEdit.Wrap
           color: root.fg
@@ -298,9 +304,10 @@ Rectangle {
           selectionColor: Util.alpha(root.accent, 0.35)
           font.family: root.font
           font.pixelSize: Style.font.body
-          leftPadding: 0
-          rightPadding: 0
+          padLeft: 0
+          padRight: 0
           topPadding: Style.spacing.sm
+          bottomPadding: Style.spacing.sm
           background: Item {}
           // Drop files here (images from a browser too): uploaded to Linear.
           DropArea {
@@ -325,9 +332,6 @@ Rectangle {
             if (keyboard.altMenu(event)) return
             if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && (event.modifiers & Qt.ControlModifier)) {
               editorOps.saveIssue()
-              event.accepted = true
-            } else if (event.key === Qt.Key_V && (event.modifiers & Qt.ControlModifier) && !(event.modifiers & Qt.ShiftModifier)) {
-              uploads.pasteInto(descField)
               event.accepted = true
             } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
               // Tab moves on (to the property pills), it does not type a tab.
@@ -392,12 +396,12 @@ Rectangle {
         spacing: Style.spacing.sm
         Row {
           spacing: Style.spacing.sm
-          TextField {
+          TextBox {
             id: parentField
             width: Math.min(editorColumn.width - (removeParent.visible ? removeParent.width + Style.spacing.sm : 0), Style.space(380))
             verticalPadding: 0
-            implicitHeight: root.inlineHeight
-            verticalAlignment: TextInput.AlignVCenter
+            height: root.inlineHeight
+            verticalAlignment: TextEdit.AlignVCenter
             font.pixelSize: Style.font.bodySmall
             placeholderText: (ed.parentIssue ? "Change the parent: " : "Parent: ") + "ID or title, e.g. " + (ed.team.key || "ENG") + "-12"
             onTextChanged: if (activeFocus) editorOps.updateSuggest("parent", text)

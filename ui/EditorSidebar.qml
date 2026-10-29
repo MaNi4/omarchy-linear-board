@@ -123,22 +123,22 @@ Rectangle {
       Row {
         width: parent.width
         spacing: Style.spacing.xs
-        TextField {
+        TextBox {
           id: edTimeField
           width: (parent.width - parent.spacing) * 0.45
           verticalPadding: 0
-          implicitHeight: root.inlineHeight
-          verticalAlignment: TextInput.AlignVCenter
+          height: root.inlineHeight
+          verticalAlignment: TextEdit.AlignVCenter
           font.pixelSize: Style.font.bodySmall
           placeholderText: "45m, 1h 30m"
           Keys.onReturnPressed: function(event) { edTimeAdd.clicked(); event.accepted = true }
         }
-        TextField {
+        TextBox {
           id: edTimeDate
           width: (parent.width - parent.spacing) * 0.55
           verticalPadding: 0
-          implicitHeight: root.inlineHeight
-          verticalAlignment: TextInput.AlignVCenter
+          height: root.inlineHeight
+          verticalAlignment: TextEdit.AlignVCenter
           font.pixelSize: Style.font.bodySmall
           text: root.today
           Keys.onReturnPressed: function(event) { edTimeAdd.clicked(); event.accepted = true }
@@ -147,12 +147,12 @@ Rectangle {
       Row {
         width: parent.width
         spacing: Style.spacing.xs
-        TextField {
+        TextBox {
           id: edTimeNote
           width: parent.width - edTimeAdd.width - parent.spacing
           verticalPadding: 0
-          implicitHeight: root.inlineHeight
-          verticalAlignment: TextInput.AlignVCenter
+          height: root.inlineHeight
+          verticalAlignment: TextEdit.AlignVCenter
           font.pixelSize: Style.font.bodySmall
           placeholderText: "Note"
           Keys.onReturnPressed: function(event) { edTimeAdd.clicked(); event.accepted = true }

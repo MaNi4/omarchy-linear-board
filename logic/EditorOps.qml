@@ -742,8 +742,11 @@ Item {
     })
   }
 
+  // Links come from issue text anyone in the team can write: only web and
+  // mail links are opened, never file:// or anything xdg-open could take
+  // for an option.
   function openInLinear(url) {
-    if (!url) return
+    if (!Markdown.openable(url)) { if (url) notices.notify("Not opened (only http, https and mailto links): " + url, true); return }
     Quickshell.execDetached(["xdg-open", url])
   }
 }

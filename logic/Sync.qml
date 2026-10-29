@@ -55,7 +55,7 @@ Item {
 
   function saveOutbox() {
     if (!root.dirsReady) return
-    outboxFile.setText(JSON.stringify(sync.outbox.map(function(o) { return { label: o.label, query: o.query, variables: o.variables } })) + "\n")
+    privateFiles.write(outboxFile, JSON.stringify(sync.outbox.map(function(o) { return { label: o.label, query: o.query, variables: o.variables } })) + "\n")
   }
 
   function flushOutbox() {

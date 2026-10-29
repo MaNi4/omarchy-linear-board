@@ -124,7 +124,7 @@ Item {
   function saveTime(data) {
     if (!timeTracker.timeWritable) { notices.notify(timeTracker.timeError || "The time file cannot be written right now.", true); return false }
     timeTracker.timeData = data
-    timeFile.setText(Time.serialize(data))
+    privateFiles.write(timeFile, Time.serialize(data))
     inboxCtl.writeInboxState()
     return true
   }
@@ -358,7 +358,7 @@ Item {
       var keep = timeTracker.timeData
       // With no settings file in the folder yet, this computer's go there.
       shared.createIfMissing = !!location && !settingsExist
-      timeLocationFile.setText(location ? location + "\n" : "")
+      privateFiles.write(timeLocationFile, location ? location + "\n" : "")
       timeTracker.timeLocation = location
       if (!timeExists) {
         // Nothing there yet: the current entries move along.
@@ -381,7 +381,7 @@ Item {
 
   function exportTo(path, text, what) {
     exportFile.path = path
-    exportFile.setText(text)
+    privateFiles.write(exportFile, text)
     notices.notify(what + " saved to " + path.replace(root.home, "~"))
   }
 

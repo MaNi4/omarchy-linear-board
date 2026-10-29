@@ -106,12 +106,12 @@ Column {
           onClicked: ed.relKind = modelData.id
         }
       }
-      TextField {
+      TextBox {
         id: relationField
         width: Style.space(260)
         verticalPadding: 0
-        implicitHeight: root.inlineHeight
-        verticalAlignment: TextInput.AlignVCenter
+        height: root.inlineHeight
+        verticalAlignment: TextEdit.AlignVCenter
         font.pixelSize: Style.font.bodySmall
         placeholderText: "ID or title, e.g. " + (ed.team.key || "ENG") + "-12"
         onTextChanged: if (activeFocus) editorOps.updateSuggest("relation", text)
@@ -143,14 +143,14 @@ Column {
         }
       }
     }
-    TextField {
+    TextBox {
       id: linkField
       Keys.onPressed: function(event) { keyboard.altMenu(event) }
       visible: ed.issueId !== ""
       width: Math.min(parent.width, Style.space(420))
       verticalPadding: 0
-      implicitHeight: root.inlineHeight
-      verticalAlignment: TextInput.AlignVCenter
+      height: root.inlineHeight
+      verticalAlignment: TextEdit.AlignVCenter
       font.pixelSize: Style.font.bodySmall
       placeholderText: "Add a link (URL) ↵"
       Keys.onReturnPressed: function(event) { editorOps.addLink(text); event.accepted = true }

@@ -4,7 +4,8 @@
   "description": "Tests for the mani4.linear-board Omarchy plugin",
   "scripts": {
     "test": "node tests/helpers.test.js && node tests/time.test.js && node tests/shared.test.js && node tests/hotkey.test.js && node tests/refs.test.js && node tests/members.test.js && node tests/api.test.js",
-    "test:api": "node tests/api.test.js"
+    "test:api": "node tests/api.test.js",
+    "test:qml": "QT_QPA_PLATFORM=offscreen ${QMLTESTRUNNER:-/usr/lib/qt6/bin/qmltestrunner} -import tests/qml/imports -input tests/qml"
   },
   "devDependencies": {
     "graphql": "16.14.2"

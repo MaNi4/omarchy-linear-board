@@ -4,8 +4,25 @@
 // typing help and @mentions. Qt's own Markdown cannot do these.
 // Pure helpers, no QML or network, so tests run them with node.
 
+// Entities already in the text (&lt; from escapeRawHtml) are kept.
 function escapeHtml(t) {
-  return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  return String(t).replace(/&(?![A-Za-z]+;|#\d+;)/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+}
+
+// Raw HTML in issue text (anyone in the team can write it) is shown as
+// text: Qt would draw it, and load an <img> from any server. Code spans and
+// fenced blocks are left as they are, Markdown shows them literally anyway.
+// <https://…> autolinks become plain links.
+function escapeRawHtml(md) {
+  var fence = null
+  return String(md || "").split("\n").map(function(line) {
+    var f = line.match(/^\s{0,3}(```|~~~)/)
+    if (fence) { if (f && f[1] === fence) fence = null; return line }
+    if (f) { fence = f[1]; return line }
+    return line.split(/(`+[^`]*`+)/).map(function(part, i) {
+      return i % 2 ? part : part.replace(/<((?:https?:\/\/|mailto:)[^\s<>]+)>/gi, "$1").replace(/<(?=[A-Za-z\/!?])/g, "&lt;")
+    }).join("")
+  }).join("\n")
 }
 
 // A link as inline HTML with its own color: Qt draws Markdown links in the
@@ -137,7 +154,7 @@ function listEnter(text, cursor) {
 // them out first where the board can draw them), profile links read as
 // @mentions, and with linkColor every link is drawn in that color.
 function displayMarkdown(md, linkColor) {
-  var out = String(md || "")
+  var out = escapeRawHtml(md)
     .replace(/!\[([^\]]*)\]\(([^)\s]+)[^)]*\)/g, function(m, alt, url) { return "[🖼 " + (alt || "image") + "](" + url + ")" })
     .replace(/(^|[^(\[])(https:\/\/linear\.app\/[^\/\s]+\/profiles\/([A-Za-z0-9._-]+))/g, function(m, pre, url, user) {
       return pre + "[@" + user + "](" + url + ")"
@@ -145,7 +162,12 @@ function displayMarkdown(md, linkColor) {
   if (!linkColor) return out
   return out
     .replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g, function(m, text, url) { return htmlLink(text, url, linkColor) })
-    .replace(/(^|[\s(])(https?:\/\/[^\s<>)]+)/g, function(m, pre, url) { return pre + htmlLink(url, url, linkColor) })
+    .replace(/(^|[\s(])(https?:\/\/(?:(?!&lt;)[^\s<>)])+)/g, function(m, pre, url) { return pre + htmlLink(url, url, linkColor) })
+}
+
+// Links the board opens with xdg-open: web and mail only.
+function openable(url) {
+  return /^(https?:\/\/[^\s]+|mailto:[^\s]+)$/i.test(String(url || ""))
 }
 
 // "@que" right before the cursor: what to complete, or null.

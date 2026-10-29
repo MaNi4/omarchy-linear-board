@@ -113,7 +113,7 @@ Item {
       onClicked: lists.openTriage()
     }
 
-    TextField {
+    TextBox {
       id: searchField
       width: Math.min(Style.space(280), headerLeft.width)
       placeholderText: root.icon.search + "  Filter board · an issue ID or Enter: search Linear"

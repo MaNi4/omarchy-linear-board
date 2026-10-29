@@ -347,7 +347,8 @@ Item {
     root.gqlWith(key, Linear.Q_BOOT, {}, function(data) {
       root.connecting = false
       root.apiKey = key
-      if (key !== root.envKey) keyFile.setText(key + "\n")
+      setupField.text = ""
+      if (key !== root.envKey) privateFiles.write(keyFile, key + "\n")
       sync.applyBoot(data)
       sync.loadTeam()
       Qt.callLater(root.focusBoard)
@@ -372,8 +373,8 @@ Item {
     inboxCtl.since = ""
     inboxCtl.writeInboxState()
     root.dialog = ""
-    keyFile.setText("")
-    cacheFile.setText("{}\n")
+    privateFiles.write(keyFile, "")
+    privateFiles.write(cacheFile, "{}\n")
     Qt.callLater(root.focusBoard)
   }
 
@@ -383,7 +384,7 @@ Item {
     for (var p in patch) next[p] = patch[p]
     var toShare = Shared.differs(root.config, next)
     root.config = next
-    if (root.dirsReady) configFile.setText(JSON.stringify(next, null, 2) + "\n")
+    if (root.dirsReady) privateFiles.write(configFile, JSON.stringify(next, null, 2) + "\n")
     if (toShare) shared.save()
   }
 
@@ -392,13 +393,13 @@ Item {
     var reload = Linear.doneWindow(next.doneWindow).id !== Linear.doneWindow(root.config.doneWindow).id
     root.config = next
     if (reload && root.team) sync.loadTeam()
-    if (root.dirsReady) configFile.setText(JSON.stringify(next, null, 2) + "\n")
+    if (root.dirsReady) privateFiles.write(configFile, JSON.stringify(next, null, 2) + "\n")
     root.clampSelection()
   }
 
   function saveCache() {
     if (!root.dirsReady) return
-    cacheFile.setText(JSON.stringify({
+    privateFiles.write(cacheFile, JSON.stringify({
       teamId: root.config.teamId, projectId: root.config.projectId,
       viewer: root.viewer, teams: root.teams, team: root.team, labels: root.labels,
       projects: root.projects, members: root.members, cycles: root.cycles, issues: root.issues
@@ -422,8 +423,11 @@ Item {
 
   Process {
     id: mkdirs
-    command: ["sh", "-c", "umask 077 && mkdir -p \"$1\" \"$2\" \"$3\" \"$4\"", "sh", root.configDir, root.cacheDir, root.runtimeDir, root.dataDir]
-    running: true
+    // Files an older version left readable by others become 0600 (see logic/PrivateFiles.qml).
+    command: ["sh", "-c", "umask 077 && mkdir -p \"$1\" \"$2\" \"$3\" \"$4\" && find \"$@\" -type f ! -perm 600 -exec sh -c '" + privateFiles.tightenScript.replace(/'/g, "'\\''") + "' sh {} +",
+      "sh", root.configDir, root.cacheDir, root.runtimeDir, root.dataDir]
+    // Started once everything exists: the command reads privateFiles, made further down.
+    Component.onCompleted: running = true
     onExited: function(code, status) {
       root.dirsReady = true
       configFile.path = root.configDir + "/config.json"
@@ -498,6 +502,10 @@ Item {
   }
 
   Notices { id: notices }
+
+  PrivateFiles { id: privateFiles }
+
+  Clipboard { id: clipboard }
 
   TimeTracker { id: timeTracker }
 
@@ -832,10 +840,9 @@ Item {
             Label { text: "2"; color: root.accent; font.bold: true; anchors.verticalCenter: parent.verticalCenter }
             Label { text: "Paste it here and press Enter"; anchors.verticalCenter: parent.verticalCenter }
           }
-          TextField {
+          SecretField {
             id: setupField
             width: parent.width
-            password: true
             placeholderText: "lin_api_…"
             Keys.onReturnPressed: function(event) { root.connect(setupField.text); event.accepted = true }
             Keys.onEnterPressed: function(event) { root.connect(setupField.text); event.accepted = true }

@@ -42,8 +42,8 @@ function localParts(text) {
   for (const m of text.matchAll(/^\s*(\w+)\s*\{\s*(?:\n\s*)?id:\s*(\w+)/gm)) {
     for (const dir of ["logic", "ui"]) {
       const f = dir + "/" + m[1] + ".qml"
-      // Wrappers of Qt's Text (Label…) have all of Text's members; skip them.
-      if (fs.existsSync(path.join(root, f)) && !/^Text\s*\{/m.test(read(f))) out[m[2]] = f
+      // Wrappers of Qt's Text and TextEdit (Label, TextBox) have all of their members; skip them.
+      if (fs.existsSync(path.join(root, f)) && !/^(Text|TextEdit)\s*\{/m.test(read(f))) out[m[2]] = f
     }
   }
   return out

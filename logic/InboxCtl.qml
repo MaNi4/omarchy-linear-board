@@ -90,7 +90,7 @@ Item {
       var newest = Inbox.newestTime(list)
       if (newest > inboxCtl.since) {
         inboxCtl.since = newest
-        seenFile.setText(newest + "\n")
+        privateFiles.write(seenFile, newest + "\n")
       }
       inboxCtl.clampInboxCursor()
       if (root.config.desktopNotify) inboxCtl.announce(fresh)
@@ -110,7 +110,7 @@ Item {
       return { title: n.title, subtitle: n.subtitle, identifier: n.identifier }
     })
     var r = timeTracker.timeData.running
-    inboxFile.setText(JSON.stringify({ connected: !!root.apiKey, unread: inboxCtl.unreadCount, items: unread,
+    privateFiles.write(inboxFile, JSON.stringify({ connected: !!root.apiKey, unread: inboxCtl.unreadCount, items: unread,
       timer: r ? { identifier: r.identifier, title: r.title, startedAt: r.startedAt, projectName: r.projectName || "",
         projectCode: r.projectId && root.projectById(r.projectId) ? root.codeFor(r.projectId)
           : (r.projectName ? Issues.projectCode({ id: r.projectId || "", name: r.projectName }, root.config.projectCodes) : "") } : null,

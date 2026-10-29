@@ -144,10 +144,16 @@ Column {
       width: parent.width
       spacing: Style.spacing.md
       QQC.ScrollView {
+        id: commentScroll
         Layout.fillWidth: true
         Layout.preferredHeight: Style.space(70)
-        QQC.TextArea {
+        TextBox {
           id: commentField
+          multiline: true
+          imagePaste: true
+          flickable: commentScroll.contentItem
+          width: commentScroll.availableWidth
+          height: Math.max(implicitHeight, commentScroll.availableHeight)
           placeholderText: ed.replyTo ? "Reply… Ctrl+Enter sends" : "Write a comment… @ mentions, paste or drop images, Ctrl+Enter sends"
           onTextChanged: editorOps.updateMention()
           onCursorPositionChanged: editorOps.updateMention()
@@ -157,7 +163,10 @@ Column {
           selectionColor: Util.alpha(root.accent, 0.35)
           font.family: root.font
           font.pixelSize: Style.font.body
-          padding: Style.spacing.lg
+          padLeft: Style.spacing.lg
+          padRight: Style.spacing.lg
+          topPadding: Style.spacing.lg
+          bottomPadding: Style.spacing.lg
           background: Rectangle {
             radius: root.radius
             color: Util.alpha(root.fg, 0.04)
@@ -191,9 +200,6 @@ Column {
             } else if (event.key === Qt.Key_Tab && ed.mention) {
               var m = Markdown.mentionMatches(root.members, ed.mention.query)
               if (m.length) { editorOps.insertMention(m[0]); event.accepted = true }
-            } else if (event.key === Qt.Key_V && (event.modifiers & Qt.ControlModifier) && !(event.modifiers & Qt.ShiftModifier)) {
-              uploads.pasteInto(commentField)
-              event.accepted = true
             } else if (event.key === Qt.Key_Escape && (ed.editingCommentId || ed.replyTo)) {
               if (ed.editingCommentId) editorOps.cancelEditComment()
               ed.replyTo = null

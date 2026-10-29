@@ -105,7 +105,7 @@ Rectangle {
               color: st.color
               MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: workspace.updateState(st.id, { color: Issues.nextColor(st.color) }) }
             }
-            TextField {
+            TextBox {
               Layout.fillWidth: true
               text: st.name
               opacity: hidden ? 0.5 : 1
@@ -140,7 +140,7 @@ Rectangle {
         RowLayout {
           visible: root.settingsTab === "columns"
           width: parent.width
-          TextField {
+          TextBox {
             id: newStateField
             property string type: "started"
             Layout.fillWidth: true
@@ -174,7 +174,7 @@ Rectangle {
               color: l.color
               MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: workspace.updateLabel(l.id, { color: Issues.nextColor(l.color) }) }
             }
-            TextField {
+            TextBox {
               Layout.fillWidth: true
               text: l.name
               onEditingFinished: if (text.trim() && text.trim() !== l.name) workspace.updateLabel(l.id, { name: text.trim() })
@@ -186,7 +186,7 @@ Rectangle {
         RowLayout {
           visible: root.settingsTab === "labels"
           width: parent.width
-          TextField {
+          TextBox {
             id: newLabelSettingsField
             Layout.fillWidth: true
             placeholderText: "New label name"
@@ -225,7 +225,7 @@ Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
               }
             }
-            TextField {
+            TextBox {
               id: keyInput
               width: Math.min(parent.width, Style.space(320))
               placeholderText: "Type a key, e.g. super + alt + l"
@@ -328,7 +328,7 @@ Rectangle {
             width: settingsBody.width
             spacing: Style.spacing.md
             Dot { dotColor: p.color; Layout.preferredWidth: Style.space(12); Layout.preferredHeight: Style.space(12) }
-            TextField {
+            TextBox {
               // Short code shown next to issue ids on the board.
               Layout.preferredWidth: Style.space(110)
               text: root.codeFor(p.id)
@@ -336,7 +336,7 @@ Rectangle {
               onEditingFinished: root.setProjectCode(p.id, text)
               Keys.onReturnPressed: function(event) { keyScope.forceActiveFocus(); event.accepted = true }
             }
-            TextField {
+            TextBox {
               Layout.fillWidth: true
               text: p.name
               onEditingFinished: workspace.renameProject(p.id, text)
@@ -355,7 +355,7 @@ Rectangle {
         RowLayout {
           visible: root.settingsTab === "projects"
           width: parent.width
-          TextField {
+          TextBox {
             id: newProjectField
             Layout.fillWidth: true
             placeholderText: "New project name"
@@ -378,7 +378,7 @@ Rectangle {
         RowLayout {
           visible: root.settingsTab === "team"
           width: parent.width
-          TextField {
+          TextBox {
             id: teamNameField
             Layout.fillWidth: true
             text: root.team ? root.team.name : ""
@@ -390,7 +390,7 @@ Rectangle {
         RowLayout {
           visible: root.settingsTab === "team"
           width: parent.width
-          TextField {
+          TextBox {
             id: teamKeyField
             Layout.preferredWidth: Style.space(160)
             text: root.team ? root.team.key : ""
@@ -505,12 +505,12 @@ Rectangle {
           visible: root.settingsTab === "team"
           width: parent.width
           Label { text: "Archive done and canceled issues closed more than"; font.pixelSize: Style.font.bodySmall }
-          TextField {
+          TextBox {
             id: archiveDaysField
             Layout.preferredWidth: Style.space(70)
             verticalPadding: 0
-            implicitHeight: root.inlineHeight
-            verticalAlignment: TextInput.AlignVCenter
+            Layout.preferredHeight: root.inlineHeight
+            verticalAlignment: TextEdit.AlignVCenter
             text: "30"
           }
           Label { text: "days ago"; font.pixelSize: Style.font.bodySmall; Layout.fillWidth: true }
@@ -549,7 +549,7 @@ Rectangle {
           visible: root.settingsTab === "data"
           width: parent.width
           spacing: Style.spacing.sm
-          TextField {
+          TextBox {
             id: sharedFolderField
             Layout.fillWidth: true
             placeholderText: "Folder, e.g. ~/Sync/linear (empty: this computer only)"
@@ -599,7 +599,7 @@ Rectangle {
           visible: root.settingsTab === "data"
           width: parent.width
           spacing: Style.spacing.sm
-          TextField {
+          TextBox {
             id: importAllField
             Layout.fillWidth: true
             placeholderText: "Path to an export, e.g. ~/Downloads/linear-board-export-2026-10-27.json"

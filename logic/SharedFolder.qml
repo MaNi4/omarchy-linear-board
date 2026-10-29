@@ -33,7 +33,7 @@ Item {
 
   function save() {
     if (!shared.path || !shared.writable) return
-    sharedFile.setText(Shared.serialize(root.config))
+    privateFiles.write(sharedFile, Shared.serialize(root.config))
   }
 
   FileView {
