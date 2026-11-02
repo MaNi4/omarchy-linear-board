@@ -30,6 +30,9 @@ Item {
 
   Flow {
     id: headerLeft
+    anchors.left: parent.left
+    anchors.right: headerRight.left
+    anchors.top: parent.top
     anchors.rightMargin: Style.spacing.lg
     spacing: Style.spacing.lg
 
@@ -116,6 +119,7 @@ Item {
     TextBox {
       id: searchField
       width: Math.min(Style.space(280), headerLeft.width)
+      height: Style.spacing.controlHeight + Style.space(4)
       placeholderText: root.icon.search + "  Filter board · an issue ID or Enter: search Linear"
       onTextChanged: { root.query = text; root.clampSelection() }
       // Typing filters the cards on the board; Enter also looks through
@@ -138,6 +142,8 @@ Item {
 
   Row {
     id: headerRight
+    anchors.right: parent.right
+    anchors.top: parent.top
     spacing: Style.spacing.lg
 
     Label {
