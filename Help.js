@@ -15,7 +15,7 @@ var SECTIONS = {
       [["Ctrl+K"], "Find any action by name, with its key"], [["?"], "Help for the window you are in (F1 also while typing)"] ] },
     { title: "Move", rows: [
       [["H", "J", "K", "L"], "Left, down, up, right (or arrows)"],
-      [["Shift", "+", "H J K L"], "Move the issue (or Shift + arrows)"], [["Enter"], "Open the issue (or E)"], [["C"], "New issue (or N)"] ] },
+      [["Shift", "+", "H J K L"], "Move the issue, or all picked ones (or Shift + arrows)"], [["Enter"], "Open the issue (or E)"], [["C"], "New issue (or N)"] ] },
     { title: "Change the issue", rows: [
       [["S"], "Status"], [["P"], "Priority"], [["A"], "Assignee"], [["I"], "Assign to me"],
       [["T"], "Labels (tags): add, or remove when ✓ (or Ctrl+L)"], [["Shift+P"], "Project"], [["Shift+C"], "Cycle"], [["Ctrl+Shift+C"], "Current cycle"],

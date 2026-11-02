@@ -307,23 +307,50 @@ Item {
   readonly property string pluginDir: String(Qt.resolvedUrl(".")).replace(/^[a-z]+:\/\//, "").replace(/\/?$/, "/")
   readonly property string pluginId: (root.manifest && root.manifest.id) || "mani4.linear-board"
   // ---- network -----------------------------------------------------------------------
+  // Requests still waiting for Linear: { xhr, at, finish }. A connection left
+  // over from before a suspend can hang forever without an error, and then
+  // the board stays on "Loading…"; requestWatchdog gives up on it instead.
+  readonly property int requestTimeoutMs: 30000
+  property var inflight: []
+
+  Timer {
+    id: requestWatchdog
+    interval: 5000
+    repeat: true
+    running: root.inflight.length > 0
+    onTriggered: {
+      var now = Date.now()
+      root.inflight.filter(function(r) { return now - r.at > root.requestTimeoutMs })
+        .forEach(function(r) { r.finish(true) })
+    }
+  }
+
   function gqlWith(key, query, variables, ok, fail) {
     var xhr = new XMLHttpRequest()
+    var req = { xhr: xhr, at: Date.now(), finish: null }
+    var done = false
     root.pending++
-    xhr.onreadystatechange = function() {
-      if (xhr.readyState !== XMLHttpRequest.DONE) return
-      if (!root) return   // the board was unloaded (shell restart) while this was in flight
+    root.inflight = root.inflight.concat([req])
+    req.finish = function(timedOut) {
+      if (done || !root) return   // !root: the board was unloaded (shell restart) while this was in flight
+      done = true
+      root.inflight = root.inflight.filter(function(r) { return r !== req })
       root.pending = Math.max(0, root.pending - 1)
+      if (timedOut) xhr.abort()
+      var status = timedOut ? 0 : xhr.status
       var body = null
-      try { body = JSON.parse(xhr.responseText) } catch (e) { body = null }
-      if (xhr.status === 200 && body && body.data && !body.errors) {
+      if (!timedOut) try { body = JSON.parse(xhr.responseText) } catch (e) { body = null }
+      if (status === 200 && body && body.data && !body.errors) {
         if (ok) ok(body.data)
       } else {
-        var msg = Linear.errorMessage(body, xhr.status)
-        if (xhr.status === 401 || /authenticat/i.test(msg)) sync.keyRejected(key, msg)
-        if (fail) fail(msg, xhr.status)
+        var msg = timedOut ? "Linear did not answer. Check your connection and try again." : Linear.errorMessage(body, status)
+        if (status === 401 || /authenticat/i.test(msg)) sync.keyRejected(key, msg)
+        if (fail) fail(msg, status)
         else notices.notify(msg, true)
       }
+    }
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState === XMLHttpRequest.DONE) req.finish(false)
     }
     xhr.open("POST", Linear.ENDPOINT)
     xhr.setRequestHeader("Content-Type", "application/json")

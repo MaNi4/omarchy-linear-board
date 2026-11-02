@@ -45,6 +45,8 @@ Item {
 
   // Keyboard move: one column left/right, keeping roughly the same height.
   function shiftSelected(dc, di) {
+    var picked = bulk.actionIds()
+    if (dc !== 0 && picked.length > 1) { issueOps.shiftPicked(picked, dc); return }
     var issue = root.selectedIssue
     if (!issue) return
     root.cursorShown = true
@@ -65,6 +67,48 @@ Item {
       var to = all.indexOf(col[j].id)
       issueOps.moveIssue(issue.id, issue.stateId, di > 0 ? to + 1 : to)
     }
+  }
+
+  // Shift+←/→ with picked cards: each one goes one column over from its own
+  // column, to the end of it, in board order. One undo step for all of them.
+  function shiftPicked(ids, dc) {
+    var colOf = {}
+    root.columns.forEach(function(c, n) { colOf[c.id] = n })
+    var plans = {}, targets = {}, moved = []
+    root.issues.slice().sort(Issues.byOrder).forEach(function(i) {
+      if (ids.indexOf(i.id) < 0 || colOf[i.stateId] === undefined) return
+      var to = root.columns[colOf[i.stateId] + dc]
+      if (!to) return   // already in the first/last column
+      if (!targets[to.id]) targets[to.id] = Issues.issuesIn(root.issues, to.id)
+      plans[i.id] = { stateId: to.id, sortOrder: Issues.sortOrderAt(targets[to.id], targets[to.id].length) }
+      targets[to.id].push({ id: i.id, sortOrder: plans[i.id].sortOrder })
+      moved.push(i.id)
+    })
+    if (!moved.length) return
+    root.cursorShown = true
+    var before = root.issues
+    var cursorId = root.selectedIssue ? root.selectedIssue.id : ""
+    var changes = []
+    moved.forEach(function(id) { changes = changes.concat(undoer.undoChanges([id], plans[id])) })
+    var undoKey = undoer.pushUndo({ label: "move of " + moved.length + " issues", changes: changes })
+    root.editSeq++
+    moved.forEach(function(id) { root.issues = Issues.patchIssue(root.issues, id, plans[id]) })
+    if (cursorId) root.selectIssue(cursorId)
+    undoer.notifyUndo("Moved " + moved.length + " issues", undoKey)
+    var failed = false
+    moved.forEach(function(id) {
+      sync.send("Move issue", Linear.M_ISSUE_UPDATE, { id: id, input: plans[id] }, function(data) {
+        root.issues = Issues.upsertIssue(root.issues, Linear.toIssue(data.issueUpdate.issue))
+        root.saveCache()
+      }, function(msg) {
+        if (failed) return
+        failed = true
+        root.issues = before
+        undoer.dropUndo(undoKey)
+        notices.notify("Could not move the issues: " + msg, true)
+        sync.loadTeam()
+      })
+    })
   }
 
   // parent: optional { id, identifier, title } for a new sub-issue.

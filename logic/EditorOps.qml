@@ -252,7 +252,7 @@ Item {
         undoer.notifyUndo("Created " + issue.identifier, ck)
         root.saveCache()
       }, function(msg) { notices.notify("Could not create the issue: " + msg, true) })
-      var again = ed.createMore ? { teamId: ed.team.id, otherTeam: otherTeam, stateId: create.stateId, projectId: create.projectId || "",
+      var again = ed.createMore ? { teamData: ed.teamData, stateId: create.stateId, projectId: create.projectId || "",
         labels: create.labelIds.slice(), assigneeId: create.assigneeId || "", parent: ed.parentIssue,
         priority: ed.priority, estimate: ed.estimate, cycleId: ed.cycleId || "",
         milestoneId: ed.milestoneId || "", due: editor.dueField.text } : null
@@ -349,7 +349,8 @@ Item {
   function createAnother(k) {
     var col = root.columnOfState(k.stateId)
     issueOps.newIssue(col >= 0 ? col : root.selCol, k.parent)
-    if (k.otherTeam) { issueOps.setEdTeam(k.teamId); return }
+    // Another team's lists are already loaded: keep them, no reload.
+    if (k.teamData) ed.teamData = k.teamData
     ed.stateId = k.stateId
     ed.projectId = k.projectId
     ed.labels = k.labels
