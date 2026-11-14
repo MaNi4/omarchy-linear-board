@@ -26,13 +26,37 @@ Item {
   property var outbox: []
   property bool outboxFlushing: false
 
+  // Updates of one issue go out one at a time: a later one waits while an
+  // earlier one is on its way, because one given up on after a timeout can
+  // still reach Linear when the network is back. issue id → waiting sends.
+  property var issueBusy: ({})
+
   function send(label, query, variables, ok, fail) {
     if (Linear.createdLookup(query)) variables = Edit.withClientId(variables)
-    root.gql(query, variables, ok, function(msg, status) {
+    // While changes wait in the outbox, later ones wait behind them, so
+    // Linear gets them in the order they were made.
+    if (sync.outbox.length && root.apiKey) { sync.enqueue(label, query, variables, ok, 0); return }
+    var issueId = query === Linear.M_ISSUE_UPDATE && variables && variables.id ? variables.id : ""
+    if (issueId) {
+      if (sync.issueBusy[issueId]) { sync.issueBusy[issueId].push([label, query, variables, ok, fail]); return }
+      sync.issueBusy[issueId] = []
+    }
+    var released = false
+    var next = function() {
+      if (!issueId || released) return
+      released = true
+      var waiting = sync.issueBusy[issueId] || []
+      delete sync.issueBusy[issueId]
+      waiting.forEach(function(a) { sync.send(a[0], a[1], a[2], a[3], a[4]) })
+    }
+    root.gql(query, variables, function(data) {
+      try { if (ok) ok(data) } finally { next() }
+    }, function(msg, status) {
       // Offline (0) or Linear's rate limit (429): sent later, from the outbox.
-      if ((status === 0 || status === 429) && root.apiKey) { sync.enqueue(label, query, variables, ok, status); return }
-      if (fail) fail(msg, status)
+      if ((status === 0 || status === 429) && root.apiKey) sync.enqueue(label, query, variables, ok, status)
+      else if (fail) fail(msg, status)
       else notices.notify(msg, true)
+      next()
     })
   }
 

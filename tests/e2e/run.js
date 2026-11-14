@@ -228,6 +228,38 @@ test("offline: changes wait in the outbox, are merged and sent later", async () 
   ok(/Back online/.test(toast()), "back online toast, got " + toast())
 })
 
+test("a later change is not overwritten by an earlier one that timed out", async () => {
+  await fresh()
+  // The first move reaches the server only after the board gave up on it.
+  await ctl("fault", { match: "^IssueUpdate$", kind: "slow", ms: 33000 })
+  ev("m('moveIssue').moveIssue('issue-3', 'state-unstarted', 0)")
+  await sleep(500)
+  ev("m('moveIssue').moveIssue('issue-3', 'state-started', 0)")
+  await waitFor(() => outbox() === 1, 55000, "both in the outbox, joined")
+  await sleep(7000)   // the slow first move lands on the server meanwhile
+  eq((await record("Issue", "issue-3")).stateId, "state-unstarted", "the late first move landed")
+  ev("m('flushOutbox').flushOutbox()")
+  await waitFor(() => outbox() === 0, 5000, "the outbox to empty")
+  eq((await record("Issue", "issue-3")).stateId, "state-started", "the last move wins")
+  eq(stateOf("issue-3"), "state-started", "the board")
+})
+
+test("while changes wait in the outbox, new ones queue behind them", async () => {
+  await fresh()
+  await ctl("fault", { match: "^IssueUpdate$", kind: "drop", times: 1 })
+  ev("m('moveIssue').moveIssue('issue-3', 'state-unstarted', 0)")
+  await waitFor(() => outbox() === 1, 5000, "the outbox")
+  const sent = (await serverLog()).filter(e => e.op === "IssueUpdate").length
+  ev("m('moveIssue').moveIssue('issue-10', 'state-started', 0)")
+  await sleep(1000)
+  eq((await serverLog()).filter(e => e.op === "IssueUpdate").length, sent, "nothing sent past the outbox")
+  eq(outbox(), 2, "queued")
+  ev("m('flushOutbox').flushOutbox()")
+  await waitFor(() => outbox() === 0, 5000, "the outbox to empty")
+  const order = (await serverLog()).filter(e => e.op === "IssueUpdate" && e.status === 200).map(e => e.variables.id)
+  eq(order.slice(-2), ["issue-3", "issue-10"], "sent in order")
+})
+
 test("the outbox survives a restart", async () => {
   await fresh()
   await ctl("fault", { match: "^IssueUpdate$", kind: "drop", times: 0 })
