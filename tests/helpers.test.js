@@ -574,6 +574,16 @@ assert.strictEqual(L.fileDeleted({}), false)
   assert.strictEqual(E.outboxJoins(wait, U, { id: "i1" }, false, U), false)
   // Two sends of one issue as one: the later values win.
   assert.deepStrictEqual(plain(E.mergeInput({ title: "A", priority: 1 }, { title: "B" })), { title: "B", priority: 1 })
+  // A change that timed out and landed late is undone by sending the newer values again.
+  const raw = { state: { id: "todo" }, priority: 2, title: "T", labels: { nodes: [{ id: "a" }, { id: "b" }] }, assignee: null }
+  assert.deepStrictEqual(plain(E.reassertInput({ stateId: "prog", sortOrder: 5 }, [{ stateId: "todo", sortOrder: 1 }], raw)), { stateId: "prog" })
+  assert.strictEqual(E.reassertInput({ stateId: "prog" }, [{ stateId: "todo" }], { state: { id: "prog" } }), null)    // landed in order
+  assert.strictEqual(E.reassertInput({ stateId: "prog" }, [{ stateId: "todo" }], { state: { id: "done" } }), null)    // changed elsewhere since
+  assert.strictEqual(E.reassertInput({ stateId: "prog" }, [], raw), null)
+  assert.strictEqual(E.reassertInput({ priority: 3 }, [{ stateId: "todo" }], raw), null)                              // the stale one did not set it
+  assert.deepStrictEqual(plain(E.reassertInput({ labelIds: ["c"] }, [{ labelIds: ["b", "a"] }], raw)), { labelIds: ["c"] })
+  assert.deepStrictEqual(plain(E.reassertInput({ assigneeId: "me" }, [{ assigneeId: null }], raw)), { assigneeId: "me" })
+  assert.strictEqual(E.reassertInput({ title: "New" }, [{ title: "T" }], raw).title, "New")
   // Creates carry their own id, so a create sent twice makes one issue.
   assert.match(E.newUuid(), /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
   assert.strictEqual(E.newUuid(() => 0), "00000000-0000-4000-8000-000000000000")

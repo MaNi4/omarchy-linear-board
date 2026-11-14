@@ -244,6 +244,22 @@ test("a later change is not overwritten by an earlier one that timed out", async
   eq(stateOf("issue-3"), "state-started", "the board")
 })
 
+test("an old change that lands after the outbox was sent is put right", async () => {
+  await fresh()
+  // The first move reaches the server 45 s late: after the board gave up on
+  // it (30 s) and after the outbox sent the newer move.
+  await ctl("fault", { match: "^IssueUpdate$", kind: "slow", ms: 45000 })
+  ev("m('moveIssue').moveIssue('issue-3', 'state-unstarted', 0)")
+  await sleep(500)
+  ev("m('moveIssue').moveIssue('issue-3', 'state-started', 0)")
+  await waitFor(() => outbox() === 1, 55000, "both in the outbox, joined")
+  ev("m('flushOutbox').flushOutbox()")
+  await waitFor(() => outbox() === 0, 5000, "the outbox to empty")
+  await waitFor(async () => (await record("Issue", "issue-3")).stateId === "state-unstarted", 20000, "the late old move to land")
+  await waitFor(async () => (await record("Issue", "issue-3")).stateId === "state-started", 30000, "the newer move sent again")
+  ok(/reached Linear late/.test(shellLog()), "logged")
+})
+
 test("while changes wait in the outbox, new ones queue behind them", async () => {
   await fresh()
   await ctl("fault", { match: "^IssueUpdate$", kind: "drop", times: 1 })

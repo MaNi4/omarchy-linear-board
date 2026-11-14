@@ -53,27 +53,30 @@ Item {
       try { if (ok) ok(data) } finally { next() }
     }, function(msg, status) {
       // Offline (0) or Linear's rate limit (429): sent later, from the outbox.
-      if ((status === 0 || status === 429) && root.apiKey) sync.enqueue(label, query, variables, ok, status)
+      // Only a lost one (0) may still reach Linear later; a refused one (429) cannot.
+      if ((status === 0 || status === 429) && root.apiKey) sync.enqueue(label, query, variables, ok, status, status === 0)
       else if (fail) fail(msg, status)
       else notices.notify(msg, true)
       next()
     })
   }
 
-  function enqueue(label, query, variables, ok, status) {
+  // attempted: it was sent and its answer lost, so it may still land late.
+  function enqueue(label, query, variables, ok, status, attempted) {
+    var stale = attempted && query === Linear.M_ISSUE_UPDATE && variables && variables.input ? [variables.input] : []
     // Edits of one issue in a row (typing while offline) are one entry:
     // the later values win.
     var last = sync.outbox[sync.outbox.length - 1]
     if (Edit.outboxJoins(last, query, variables, sync.outboxFlushing, Linear.M_ISSUE_UPDATE)) {
       var input = Edit.mergeInput(last.variables.input, variables.input)
       var prevOk = last.ok
-      var merged = { label: label, query: query, variables: { id: variables.id, input: input },
+      var merged = { label: label, query: query, variables: { id: variables.id, input: input }, stale: (last.stale || []).concat(stale),
         ok: function(data) { if (prevOk) prevOk(data); if (ok) ok(data) } }
       sync.outbox = sync.outbox.slice(0, -1).concat([merged])
       sync.saveOutbox()
       return
     }
-    sync.outbox = sync.outbox.concat([{ label: label, query: query, variables: variables, ok: ok || null }])
+    sync.outbox = sync.outbox.concat([{ label: label, query: query, variables: variables, stale: stale, ok: ok || null }])
     sync.saveOutbox()
     notices.notify((status === 429 ? "Linear's rate limit: " + label + " will be sent in a while"
       : "Offline: " + label + " will be sent when Linear is reachable") + " (" + sync.outbox.length + " waiting)", true)
@@ -81,7 +84,7 @@ Item {
 
   function saveOutbox() {
     if (!root.dirsReady) return
-    privateFiles.write(outboxFile, JSON.stringify(sync.outbox.map(function(o) { return { label: o.label, query: o.query, variables: o.variables } })) + "\n")
+    privateFiles.write(outboxFile, JSON.stringify(sync.outbox.map(function(o) { return { label: o.label, query: o.query, variables: o.variables, stale: o.stale || [] } })) + "\n")
   }
 
   function flushOutbox() {
@@ -89,6 +92,7 @@ Item {
     sync.outboxFlushing = true
     var item = sync.outbox[0]
     var sent = function(data) {
+      if (item.query === Linear.M_ISSUE_UPDATE && item.stale && item.stale.length) sync.checkLater(item)
       sync.outbox = sync.outbox.slice(1)
       sync.saveOutbox()
       sync.outboxFlushing = false
@@ -124,6 +128,35 @@ Item {
     })
   }
 
+  // Sent changes whose older values may still land: checked in Linear
+  // twice (the network can deliver the old request a while later).
+  property var checks: []
+  function checkLater(item) {
+    var now = Date.now()
+    ;[15000, 60000].forEach(function(after) {
+      sync.checks = sync.checks.concat([{ id: item.variables.id, input: item.variables.input, stale: item.stale, at: now + after }])
+    })
+  }
+  Timer {
+    interval: 5000
+    repeat: true
+    running: sync.checks.length > 0
+    onTriggered: {
+      var now = Date.now()
+      var due = sync.checks.filter(function(c) { return c.at <= now })
+      if (!due.length) return
+      sync.checks = sync.checks.filter(function(c) { return c.at > now })
+      due.forEach(function(c) {
+        root.gql(Linear.Q_ISSUE, { id: c.id }, function(d) {
+          var fix = Edit.reassertInput(c.input, c.stale, d.issue)
+          if (!fix) return
+          console.warn("linear-board: an older change to " + (d.issue.identifier || c.id) + " reached Linear late; sending the newer values again")
+          root.gql(Linear.M_ISSUE_UPDATE, { id: c.id, input: fix }, null, function() {})
+        }, function() {})
+      })
+    }
+  }
+
   Timer {
     interval: 15000
     repeat: true
@@ -143,7 +176,7 @@ Item {
       try {
         var list = JSON.parse(text())
         if (Array.isArray(list) && list.length) {
-          sync.outbox = list.map(function(o) { return { label: o.label, query: o.query, variables: o.variables, ok: null } })
+          sync.outbox = list.map(function(o) { return { label: o.label, query: o.query, variables: o.variables, stale: o.stale || [], ok: null } })
           Qt.callLater(sync.flushOutbox)
         }
       } catch (e) { console.warn("linear-board: outbox.json could not be read, waiting changes are lost: " + e) }

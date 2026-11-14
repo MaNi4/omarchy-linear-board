@@ -111,6 +111,45 @@ function outboxJoins(last, query, variables, flushing, updateQuery) {
     && last.variables.input && variables.input)
 }
 
+// A change given up on after a timeout may still reach Linear later (the
+// network sends what it already had once it is back), after the newer
+// values the outbox sent. Such inputs are kept as "stale" with the waiting
+// change; a little after it is sent, Linear is checked: a field that holds
+// a stale value instead of the newer one gets the newer one again.
+var REASSERT_FIELDS = { stateId: "state", assigneeId: "assignee", projectId: "project", cycleId: "cycle", parentId: "parent",
+  projectMilestoneId: "projectMilestone" }
+
+// An issue field as Linear's input names it, read from an issue Linear sent.
+function issueInputValue(raw, field) {
+  if (!raw) return undefined
+  if (REASSERT_FIELDS[field]) { var o = raw[REASSERT_FIELDS[field]]; return o ? o.id : null }
+  if (field === "labelIds") return raw.labels && raw.labels.nodes ? raw.labels.nodes.map(function(l) { return l.id }) : undefined
+  return raw[field] === undefined ? undefined : raw[field]
+}
+
+function sameValue(a, b) {
+  var norm = function(v) {
+    if (v === undefined || v === "") v = null
+    return JSON.stringify(Array.isArray(v) ? v.slice().sort() : v)
+  }
+  return norm(a) === norm(b)
+}
+
+// The part of `sent` to send again: fields where Linear now holds a value
+// from one of the stale inputs that differs from what was sent last.
+// Fields Linear reports differently (unknown here) are left alone.
+function reassertInput(sent, stale, raw) {
+  var out = {}, any = false
+  for (var f in sent) {
+    if (f === "sortOrder" || f === "addedLabelIds" || f === "removedLabelIds") continue
+    var now = issueInputValue(raw, f)
+    if (now === undefined || sameValue(now, sent[f])) continue
+    var wasStale = (stale || []).some(function(s) { return s && (f in s) && !sameValue(s[f], sent[f]) && sameValue(s[f], now) })
+    if (wasStale) { out[f] = sent[f]; any = true }
+  }
+  return any ? out : null
+}
+
 // A random (v4) UUID; `random` is Math.random unless a test gives one.
 function newUuid(random) {
   var r = random || Math.random
