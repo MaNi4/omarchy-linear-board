@@ -30,6 +30,7 @@ Item {
   readonly property string configDir: (Quickshell.env("XDG_CONFIG_HOME") || (home + "/.config")) + "/omarchy-linear-board"
   readonly property string cacheDir: (Quickshell.env("XDG_CACHE_HOME") || (home + "/.cache")) + "/omarchy-linear-board"
   readonly property string envKey: Quickshell.env("LINEAR_API_KEY") || ""
+  readonly property string endpoint: Linear.endpointFor(Quickshell.env("LINEAR_BOARD_ENDPOINT"))
   // Shared with the bar widget: unread count and the latest unread notifications.
   readonly property string dataDir: (Quickshell.env("XDG_DATA_HOME") || (home + "/.local/share")) + "/omarchy-linear-board"
   readonly property string runtimeDir: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/omarchy-linear-board"
@@ -375,7 +376,7 @@ Item {
     xhr.onreadystatechange = function() {
       if (xhr.readyState === XMLHttpRequest.DONE) req.finish(false)
     }
-    xhr.open("POST", Linear.ENDPOINT)
+    xhr.open("POST", root.endpoint)
     xhr.setRequestHeader("Content-Type", "application/json")
     xhr.setRequestHeader("Authorization", key)
     xhr.send(JSON.stringify({ query: query, variables: variables || {} }))
@@ -404,7 +405,7 @@ Item {
       Qt.callLater(root.focusBoard)
     }, function(msg) {
       root.connecting = false
-      root.setupError = /authenticat|401/i.test(msg) ? "Linear did not accept this key. Check that you copied all of it." : msg
+      root.setupError = /authenticat|401|rejected/i.test(msg) ? "Linear did not accept this key. Check that you copied all of it." : msg
     })
   }
 

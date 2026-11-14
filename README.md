@@ -138,7 +138,13 @@ Every file in `ui/` and `logic/` is created inside `Board.qml` (the editor's par
 - `tests/members.test.js`: every `root.x`, `pickers.x`, `ed.x`… one part of the board uses from another exists there.
 - `tests/api.test.js`: every query and mutation, the input fields the board sends, and the filters and inputs it builds (the issue editor's saves and their undo included), checked against Linear's current schema (downloaded from linear/linear). It fails when something is gone or deprecated. `LINEAR_SCHEMA=live LINEAR_API_KEY=… node tests/api.test.js` reads the schema from the API itself.
 
-GitHub Actions runs them on every push and every morning, so a change in Linear's API fails a run (GitHub sends an email). With a `LINEAR_API_KEY` repository secret it also checks the live API's schema.
+End to end, on an Omarchy machine:
+
+    npm run test:e2e        # or: node tests/e2e/run.js <name filter>
+
+`tests/e2e/run.js` starts `tests/fake-linear.js`, a stand-in for Linear's API that answers from made-up data (a team, issues, an inbox) against Linear's schema, and runs the board with its bar widget in a separate, offscreen Quickshell with its files in a temporary directory. Nothing shows on the desktop and nothing reaches Linear or your own files; desktop notifications, `hyprctl`, `wl-copy` and `xdg-open` are stubs. It covers loading, edits, the offline outbox, rate limits, timeouts, broken answers, a wrong or revoked key, the inbox and its fallback, desktop notifications, paging and the bar widget. The fake server also works by hand: `node tests/fake-linear.js`, then start a shell with `LINEAR_BOARD_ENDPOINT=http://127.0.0.1:47123/graphql LINEAR_API_KEY=lin_api_fake` (only an address on this machine is accepted there).
+
+GitHub Actions runs `npm test` on every push and every morning, so a change in Linear's API fails a run (GitHub sends an email). With a `LINEAR_API_KEY` repository secret it also checks the live API's schema.
 
 ## License
 

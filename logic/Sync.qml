@@ -27,6 +27,7 @@ Item {
   property bool outboxFlushing: false
 
   function send(label, query, variables, ok, fail) {
+    if (Linear.createdLookup(query)) variables = Edit.withClientId(variables)
     root.gql(query, variables, ok, function(msg, status) {
       // Offline (0) or Linear's rate limit (429): sent later, from the outbox.
       if ((status === 0 || status === 429) && root.apiKey) { sync.enqueue(label, query, variables, ok, status); return }
@@ -63,21 +64,39 @@ Item {
     if (sync.outboxFlushing || !sync.outbox.length || !root.apiKey) return
     sync.outboxFlushing = true
     var item = sync.outbox[0]
-    root.gql(item.query, item.variables, function(data) {
+    var sent = function(data) {
       sync.outbox = sync.outbox.slice(1)
       sync.saveOutbox()
       sync.outboxFlushing = false
       if (item.ok) { try { item.ok(data) } catch (e) { console.warn("linear-board: updating the board after a waiting change failed: " + e) } }
       if (sync.outbox.length) sync.flushOutbox()
       else { notices.notify("Back online: everything was sent to Linear"); sync.loadTeam() }
-    }, function(msg, status) {
-      sync.outboxFlushing = false
-      if (status === 0 || status === 429) return   // still offline or rate limited, try again later
+    }
+    var refused = function(msg) {
       sync.outbox = sync.outbox.slice(1)
       sync.saveOutbox()
+      sync.outboxFlushing = false
       notices.notify("Linear refused a waiting change (" + item.label + "): " + msg, true)
       if (sync.outbox.length) sync.flushOutbox()
       else sync.loadTeam()
+    }
+    root.gql(item.query, item.variables, sent, function(msg, status) {
+      if (status === 0 || status === 429) { sync.outboxFlushing = false; return }   // still offline or rate limited, try again later
+      // A create refused because an earlier try (whose answer was lost) made
+      // it already: that one is the result.
+      var lookup = Linear.createdLookup(item.query)
+      var id = lookup && item.variables && item.variables.input ? item.variables.input.id : ""
+      if (!id) { refused(msg); return }
+      root.gql(lookup.query, { id: id }, function(d) {
+        if (!d[lookup.field]) { refused(msg); return }
+        var data = {}
+        data[lookup.payload] = { success: true }
+        data[lookup.payload][lookup.field] = d[lookup.field]
+        sent(data)
+      }, function(msg2, status2) {
+        if (status2 === 0 || status2 === 429) { sync.outboxFlushing = false; return }
+        refused(msg)
+      })
     })
   }
 

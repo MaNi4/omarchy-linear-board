@@ -23,11 +23,11 @@ const SCHEMA_URL = "https://raw.githubusercontent.com/linear/linear/master/packa
 // ui/). Adding a field to a request means adding it here; a request with an
 // input type missing here fails the test.
 const INPUTS = {
-  IssueCreateInput: ["teamId", "title", "description", "stateId", "priority", "labelIds", "projectId", "assigneeId",
+  IssueCreateInput: ["id", "teamId", "title", "description", "stateId", "priority", "labelIds", "projectId", "assigneeId",
     "dueDate", "estimate", "cycleId", "parentId", "projectMilestoneId"],
   IssueUpdateInput: ["title", "description", "stateId", "sortOrder", "priority", "labelIds", "addedLabelIds",
     "removedLabelIds", "projectId", "assigneeId", "dueDate", "estimate", "cycleId", "parentId", "projectMilestoneId"],
-  CommentCreateInput: ["issueId", "body", "parentId"],
+  CommentCreateInput: ["id", "issueId", "body", "parentId"],
   CommentUpdateInput: ["body"],
   IssueRelationCreateInput: ["issueId", "relatedIssueId", "type"],
   TemplateCreateInput: ["type", "name", "teamId", "templateData"],

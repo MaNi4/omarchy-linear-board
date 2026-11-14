@@ -10,6 +10,14 @@
 // request against Linear's published schema.
 
 var ENDPOINT = "https://api.linear.app/graphql"
+
+// LINEAR_BOARD_ENDPOINT points the board at a stand-in for Linear's API
+// (tests/fake-linear.js). Only a server on this machine is accepted, so the
+// key is never sent anywhere else.
+function endpointFor(override) {
+  var o = String(override || "")
+  return /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//.test(o) ? o : ENDPOINT
+}
 var KEY_URL = "https://linear.app/settings/account/security"
 
 // ---- GraphQL ----------------------------------------------------------------
@@ -87,6 +95,18 @@ var M_RELATION_CREATE = "mutation RelationCreate($input: IssueRelationCreateInpu
 var M_RELATION_DELETE = "mutation RelationDelete($id: String!) { issueRelationDelete(id: $id) { success } }"
 var M_ATTACH_URL = "mutation AttachUrl($issueId: String!, $url: String!, $title: String) { attachmentLinkURL(issueId: $issueId, url: $url, title: $title) { success attachment { id title subtitle url sourceType } } }"
 var M_ATTACHMENT_DELETE = "mutation AttachmentDelete($id: String!) { attachmentDelete(id: $id) { success } }"
+var Q_COMMENT = "query Comment($id: String!) { comment(id: $id) { " + COMMENT_FIELDS + " } }"
+
+// Creates that may wait in the offline outbox carry an id made on this
+// machine (Linear takes one in the input). When an answer is lost (a
+// timeout after Linear did create it) and the create is sent again, this
+// finds what the first try made, so there is never a second issue or comment.
+function createdLookup(query) {
+  if (query === M_ISSUE_CREATE) return { query: Q_ISSUE, field: "issue", payload: "issueCreate" }
+  if (query === M_COMMENT_CREATE) return { query: Q_COMMENT, field: "comment", payload: "commentCreate" }
+  return null
+}
+
 var M_COMMENT_UPDATE = "mutation CommentUpdate($id: String!, $input: CommentUpdateInput!) { commentUpdate(id: $id, input: $input) { success comment { " + COMMENT_FIELDS + " } } }"
 var M_COMMENT_DELETE = "mutation CommentDelete($id: String!) { commentDelete(id: $id) { success } }"
 var M_UNSUBSCRIBE = "mutation Unsubscribe($id: String!) { issueUnsubscribe(id: $id) { success } }"

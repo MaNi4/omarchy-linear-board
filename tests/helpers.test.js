@@ -574,5 +574,26 @@ assert.strictEqual(L.fileDeleted({}), false)
   assert.strictEqual(E.outboxJoins(wait, U, { id: "i1" }, false, U), false)
   // Two sends of one issue as one: the later values win.
   assert.deepStrictEqual(plain(E.mergeInput({ title: "A", priority: 1 }, { title: "B" })), { title: "B", priority: 1 })
+  // Creates carry their own id, so a create sent twice makes one issue.
+  assert.match(E.newUuid(), /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+  assert.strictEqual(E.newUuid(() => 0), "00000000-0000-4000-8000-000000000000")
+  assert.notStrictEqual(E.newUuid(), E.newUuid())
+  const v = { input: { teamId: "t", title: "A" }, other: 1 }
+  const withId = E.withClientId(v, () => 0)
+  assert.strictEqual(withId.input.id, "00000000-0000-4000-8000-000000000000")
+  assert.strictEqual(withId.other, 1)
+  assert.strictEqual(v.input.id, undefined)                              // the original is not changed
+  assert.strictEqual(E.withClientId(withId), withId)                     // an id is kept
+  assert.deepStrictEqual(E.withClientId({ id: "x" }), { id: "x" })       // no input: unchanged
+  assert.strictEqual(L.createdLookup(L.M_ISSUE_CREATE).query, L.Q_ISSUE)
+  assert.strictEqual(L.createdLookup(L.M_COMMENT_CREATE).field, "comment")
+  assert.strictEqual(L.createdLookup(L.M_ISSUE_UPDATE), null)
 }
+// Only a server on this machine may stand in for Linear's API.
+assert.strictEqual(L.endpointFor(""), L.ENDPOINT)
+assert.strictEqual(L.endpointFor("http://127.0.0.1:47123/graphql"), "http://127.0.0.1:47123/graphql")
+assert.strictEqual(L.endpointFor("http://localhost/graphql"), "http://localhost/graphql")
+assert.strictEqual(L.endpointFor("https://evil.example/graphql"), L.ENDPOINT)
+assert.strictEqual(L.endpointFor("http://127.0.0.1.evil.example/graphql"), L.ENDPOINT)
+assert.strictEqual(L.endpointFor("http://localhost@evil.example/graphql"), L.ENDPOINT)
 console.log("ok")

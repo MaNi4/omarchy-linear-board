@@ -111,6 +111,28 @@ function outboxJoins(last, query, variables, flushing, updateQuery) {
     && last.variables.input && variables.input)
 }
 
+// A random (v4) UUID; `random` is Math.random unless a test gives one.
+function newUuid(random) {
+  var r = random || Math.random
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) {
+    var n = Math.floor(r() * 16)
+    return (c === "x" ? n : (n & 3) | 8).toString(16)
+  })
+}
+
+// The variables of a create with input.id set (kept when there is one), so
+// sending it twice cannot create two (see Linear.createdLookup).
+function withClientId(variables, random) {
+  var input = (variables && variables.input) || null
+  if (!input || input.id) return variables
+  var copy = {}, inp = {}
+  for (var k in variables) copy[k] = variables[k]
+  for (var f in input) inp[f] = input[f]
+  inp.id = newUuid(random)
+  copy.input = inp
+  return copy
+}
+
 // ---- cycles ----
 
 // A cycle date typed as YYYY-MM-DD (already parsed): same time of day as
