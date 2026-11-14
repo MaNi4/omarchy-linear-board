@@ -412,7 +412,7 @@ test("creating an issue that times out is not created twice", async () => {
   await ctl("fault", { match: "^IssueCreate$", kind: "slow", ms: 33000 })
   ev("m('flushOutbox').send('New issue', Linear.M_ISSUE_CREATE, { input: { teamId: 'team-eng', title: 'Timeout test' } }, null)")
   await waitFor(() => outbox() === 1, 55000, "the timed-out create to wait in the outbox")
-  await sleep(4000)   // the slow answer arrives on the server side: the issue exists
+  await sleep(7000)   // the slow request reaches the server side: the issue exists
   ev("m('flushOutbox').flushOutbox()")
   await waitFor(() => outbox() === 0, 5000, "the outbox to empty")
   const made = (await records("Issue")).filter(i => i.title === "Timeout test")
@@ -473,7 +473,7 @@ test("a comment that times out is not posted twice", async () => {
   await ctl("fault", { match: "^CommentCreate$", kind: "slow", ms: 33000 })
   ev("m('flushOutbox').send('Comment', Linear.M_COMMENT_CREATE, { input: { issueId: 'issue-2', body: 'Only once' } }, null)")
   await waitFor(() => outbox() === 1, 55000, () => "the timed-out comment to wait (toast: " + toast() + ", log: " + shellLog().split("\n").slice(-5).join(" | ") + ")")
-  await sleep(4000)
+  await sleep(7000)
   ev("m('flushOutbox').flushOutbox()")
   await waitFor(() => outbox() === 0, 5000, "the outbox to empty")
   eq((await records("Comment")).filter(c => c.body === "Only once").length, 1, "comments")
@@ -513,4 +513,9 @@ async function main() {
   process.exit(failed ? 1 : 0)
 }
 
-main().catch(async e => { console.error(e); await stopBoard(); if (server) server.kill(); process.exit(1) })
+if (require.main === module)
+  main().catch(async e => { console.error(e); await stopBoard(); if (server) server.kill(); process.exit(1) })
+
+// tests/e2e/live.js drives the same harness against the real API.
+module.exports = { setup, startBoard, stopBoard, ev, evs, shot, shellLog, inboxState, waitFor, sleep, eq, ok, TMP, FILES, RUN,
+  outbox, toast }

@@ -29,6 +29,11 @@ ShellRoot {
     for (var i = 0; i < board.data.length; i++) { var o = board.data[i]; if (o && typeof o[fn] === "function") return o }
     return null
   }
+  // The board's part that has property `prop` (the editor state: "milestoneValid").
+  function p(prop) {
+    for (var i = 0; i < board.data.length; i++) { var o = board.data[i]; if (o && o[prop] !== undefined && typeof o[prop] !== "function") return o }
+    return null
+  }
   // The first item in the window that has property `prop` (the editor: "titleField").
   function find(prop) {
     var w = win()

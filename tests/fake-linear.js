@@ -394,10 +394,10 @@ function applyInput(rec, input) {
   }
 }
 
-// Linear's exact words for a create with an id it has are not known; the
-// board must not depend on them.
-function duplicate() {
-  return new g.GraphQLError("Entity already exists", { extensions: { code: "INVALID_INPUT", userPresentableMessage: "Something with this id already exists." } })
+// What Linear answers a create with an id it has (seen 2026-11-14).
+function duplicate(type, id) {
+  return new g.GraphQLError("conflict on insert of " + type, { extensions: { type: "invalid input", code: "INPUT_ERROR", statusCode: 400,
+    userError: true, userPresentableMessage: "Entity " + type + " with id " + id + " already exists" } })
 }
 
 function find(type, id) {
@@ -407,7 +407,7 @@ function find(type, id) {
 }
 
 function createIssue(input) {
-  if (input.id && db.byId[input.id]) throw duplicate()
+  if (input.id && db.byId[input.id]) throw duplicate("Issue", input.id)
   const team = find("Team", input.teamId)
   const n = (db.issueNumber[team.id] || 0) + 1
   db.issueNumber[team.id] = n
@@ -439,7 +439,7 @@ function mutate(name, a, info) {
   switch (m[2]) {
     case "Create": {
       if (type === "Issue") return pay(createIssue(a.input))
-      if (a.input && a.input.id && db.byId[a.input.id]) throw duplicate()
+      if (a.input && a.input.id && db.byId[a.input.id]) throw duplicate(type, a.input.id)
       const rec = put(type, { id: a.input && a.input.id })
       applyInput(rec, a.input)
       if (type === "Comment" || type === "Reaction") rec.userId = viewerId
