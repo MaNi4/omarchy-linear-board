@@ -52,6 +52,41 @@ const ENUMS = {
   ProjectUpdateHealthType: ["onTrack", "atRisk", "offTrack"]
 }
 
+// Fields Linear marks [Internal]. Since 2026-11-11 they are left out of the
+// published schema and the live introspection, but the API still answers
+// them. They are added to the schema here when missing (on Notification also
+// to every type that implements it); with LINEAR_API_KEY the test asks the
+// API for them, so their real removal still fails the test.
+const INTERNAL = {
+  Query: { notificationsUnreadCount: "Int!" },
+  Notification: { groupingKey: "String!", title: "String!", subtitle: "String!", inboxUrl: "String!" }
+}
+const INTERNAL_PROBE = "query InternalFields { notificationsUnreadCount notifications(first: 1) { nodes { " +
+  Object.keys(INTERNAL.Notification).join(" ") + " } } }"
+
+function withInternal(schema) {
+  const sdl = []
+  for (const [typeName, fields] of Object.entries(INTERNAL)) {
+    const type = schema.getType(typeName)
+    if (!type) continue   // validation then reports the type as gone
+    const types = [type].concat(g.isInterfaceType(type) ? schema.getPossibleTypes(type) : [])
+    for (const t of types) {
+      const have = t.getFields()
+      const add = Object.entries(fields).filter(([f]) => !have[f]).map(([f, ft]) => f + ": " + ft)
+      if (add.length) sdl.push("extend " + (g.isInterfaceType(t) ? "interface " : "type ") + t.name + " { " + add.join(" ") + " }")
+    }
+  }
+  return sdl.length ? g.extendSchema(schema, g.parse(sdl.join("\n"))) : schema
+}
+
+async function probeInternal() {
+  const key = process.env.LINEAR_API_KEY
+  if (!key) return []
+  const raw = await get(L.ENDPOINT, { "Content-Type": "application/json", Authorization: key }, JSON.stringify({ query: INTERNAL_PROBE }))
+  const res = JSON.parse(raw)
+  return res.errors ? res.errors.map(e => "internal fields: " + e.message) : []
+}
+
 function get(url, headers, body) {
   return new Promise((resolve, reject) => {
     const req = https.request(url, { method: body ? "POST" : "GET", headers: headers || {} }, res => {
@@ -115,8 +150,9 @@ function coerce(schema, typeName, value) {
 }
 
 async function main() {
-  const { schema, from } = await loadSchema()
-  const problems = []
+  const loaded = await loadSchema()
+  const schema = withInternal(loaded.schema), from = loaded.from
+  const problems = await probeInternal()
   const deprecated = []
   const docs = documents()
   const used = usedNames()
