@@ -99,6 +99,8 @@ async function cleanup() {
     await api("mutation($id: String!) { projectMilestoneDelete(id: $id) { success } }", { id: m.id })
   for (const u of p.project.projectUpdates.nodes.filter(u => u.body.startsWith(TAG)))
     await api("mutation($id: String!) { projectUpdateArchive(id: $id) { success } }", { id: u.id })
+  const templates = await api("query { templates { id name } }")
+  for (const t of templates.templates.filter(t => t.name.startsWith(TAG))) await api("mutation($id: String!) { templateDelete(id: $id) { success } }", { id: t.id })
   const labels = await api("query { issueLabels(first: 250, filter: { name: { startsWith: \"" + TAG + "\" } }) { nodes { id } } }")
   for (const l of labels.issueLabels.nodes) await api("mutation($id: String!) { issueLabelDelete(id: $id) { success } }", { id: l.id })
   return left
@@ -113,9 +115,12 @@ let teamId, viewerId, columns
 async function start() {
   await H.startBoard({
     config: JSON.stringify({ teamId, projectId: PROJECT, desktopNotify: false }),
-    env: { LINEAR_API_KEY: KEY, LINEAR_BOARD_ENDPOINT: "http://127.0.0.1:" + PROXY + "/graphql" }
+    // LIVE_DIRECT=1: straight to Linear (the proxy's failure tests then do not apply).
+    env: { LINEAR_API_KEY: KEY, LINEAR_BOARD_ENDPOINT: process.env.LIVE_DIRECT ? "" : "http://127.0.0.1:" + PROXY + "/graphql" }
   })
   await waitFor(() => ev("board.team && board.team.id") === teamId && ev("board.pending") === 0 && !ev("board.loadingTeam"), 20000, "the team")
+  // LIVE_CURL=1: every request through curl, as after a hung connection.
+  if (process.env.LIVE_CURL) ev("board.viaCurlUntil = Date.now() + 3600000")
   ev("board.open('{}')")
   columns = ev("board.columns.map(function(c) { return c.id })")
 }

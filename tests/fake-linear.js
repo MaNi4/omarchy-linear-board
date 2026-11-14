@@ -464,6 +464,7 @@ const AUTH_ERROR = { errors: [{ message: "Authentication required, not authentic
   code: "AUTHENTICATION_ERROR", statusCode: 401, userError: true, userPresentableMessage: "You need to authenticate to access this operation.",
   meta: {}, http: { status: 401 } } }] }
 
+const sockets = new Set()
 let schema, fullSchema, publicSchema, internalOn = true, faults = [], log = []
 
 function json(res, status, body, headers) {
@@ -474,9 +475,13 @@ function json(res, status, body, headers) {
 function control(req, res, url, body) {
   const p = url.pathname
   if (p === "/_log") return json(res, 200, log)
+  if (p === "/_sockets") return json(res, 200, { open: sockets.size, stalled: [...sockets].filter(x => x.stalled).length })
   if (p.startsWith("/_db/")) return json(res, 200, all(p.slice(5)))
   if (p === "/_control/reset") { seed(); faults = []; log = []; internalOn = true; return json(res, 200, { ok: true }) }
   if (p === "/_control/fault") { faults.push(Object.assign({ times: 1, match: "." }, body)); return json(res, 200, { ok: true, faults }) }
+  // Like a router after a suspend: connections open now are never answered
+  // again (requests on them hang); new connections work.
+  if (p === "/_control/stall") { for (const so of sockets) so.stalled = true; return json(res, 200, { ok: true, stalled: sockets.size }) }
   if (p === "/_control/clear-faults") { faults = []; return json(res, 200, { ok: true }) }
   if (p === "/_control/internal") { internalOn = !!body.on; return json(res, 200, { ok: true, internal: internalOn }) }
   if (p === "/_control/set") { const r = db.byId[body.id]; if (!r) return json(res, 404, {}); Object.assign(r, body.fields); return json(res, 200, r) }
@@ -517,6 +522,7 @@ async function handle(req, res) {
   try { body = raw ? JSON.parse(raw) : {} } catch (e) { return json(res, 400, { errors: [{ message: "Body is not JSON" }] }) }
   if (url.pathname.startsWith("/_")) return control(req, res, url, body)
   if (url.pathname !== "/graphql" || req.method !== "POST") return json(res, 404, {})
+  if (req.socket.stalled) { log.push({ at: nowIso(), op: "(on a dead connection)", variables: {}, status: 0 }); return }
   let op = body.operationName || ""
   if (!op) { const m = /^\s*(?:query|mutation)\s+(\w+)/.exec(body.query || ""); op = m ? m[1] : "anonymous" }
   const entry = { at: nowIso(), op, variables: body.variables || {}, status: 0 }
@@ -554,7 +560,10 @@ async function main() {
   fullSchema = withInternal(publicSchema)
   schema = fullSchema
   seed()
-  http.createServer((req, res) => handle(req, res).catch(e => { console.error(e); try { json(res, 500, { errors: [{ message: String(e) }] }) } catch (x) {} }))
+  const server = http.createServer((req, res) => handle(req, res).catch(e => { console.error(e); try { json(res, 500, { errors: [{ message: String(e) }] }) } catch (x) {} }))
+  server.on("connection", so => { sockets.add(so); so.on("close", () => sockets.delete(so)) })
+  server.keepAliveTimeout = 600000   // like Linear's edge: idle connections stay open
+  server
     .listen(PORT, "127.0.0.1", () => console.log("fake-linear: http://127.0.0.1:" + PORT + "/graphql (key " + KEY + ")"))
 }
 

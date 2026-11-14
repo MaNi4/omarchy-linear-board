@@ -106,6 +106,12 @@ async function startBoard(opts) {
   if (opts.wait !== false) await waitFor(() => ev("board.mode") !== "loading", 10000, "the board to start")
 }
 
+// The quickshell process under dbus-run-session.
+function childQuickshell() {
+  const out = execFileSync("pgrep", ["-P", String(shell.pid), "-x", "quickshell"]).toString().trim()
+  return Number(out.split("\n")[0])
+}
+
 async function stopBoard() {
   if (!shell) return
   try { process.kill(-shell.pid, "SIGTERM") } catch (e) {}
@@ -149,7 +155,7 @@ async function waitFor(fn, ms, what) {
     try { last = await fn(); if (last) return last } catch (e) { last = e }
     await sleep(150)
   }
-  if (typeof what === "function") what = what()
+  if (typeof what === "function") what = await what()
   throw new Error("timed out waiting for " + (what || fn.toString()) + (last instanceof Error ? " (" + last.message + ")" : ""))
 }
 
@@ -361,6 +367,53 @@ test("an answer of an unexpected shape does not break the board", async () => {
   ok(ev("board.issues.length") >= 8, "issues still shown")
   ev("board.open('{}')")
   await shot("odd-shape")
+})
+
+test("after a suspend: switching the team works, nothing stays loading", async () => {
+  await fresh()
+  // Suspend: the board is frozen, its open connections die on the way.
+  process.kill(childQuickshell(), "SIGSTOP")
+  await ctl("stall")
+  await sleep(40000)
+  process.kill(childQuickshell(), "SIGCONT")
+  const t0 = Date.now()
+  ev("m('setTeam').setTeam('team-ops')")
+  await waitFor(() => ev("board.team && board.team.key") === "OPS" && !ev("board.loadingTeam"), 45000, async () => "the other team; state: " +
+    JSON.stringify(ev("({ team: board.team && board.team.key, loading: board.loadingTeam, pending: board.pending, inflight: board.inflight.map(function(r) { return Math.round((Date.now() - r.at) / 1000) }), wokeAgo: board.wokeAt ? Math.round((Date.now() - board.wokeAt) / 1000) : -1, toast: m('notify').toast, mode: board.mode })")) +
+    "; sockets: " + JSON.stringify(await request("GET", "/_sockets")) + "; server log: " + (await serverLog()).slice(-8).map(e => e.op + ":" + e.status).join(", "))
+  const took = Date.now() - t0
+  console.log("     team loaded " + (took / 1000).toFixed(1) + " s after waking" +
+    ((await serverLog()).some(e => e.op === "(on a dead connection)") ? " (a request was lost on a dead connection)" : ""))
+  await waitFor(() => !ev("m('loadInbox').loading"), 40000, "the inbox not stuck")
+  ok(took < 20000, "loaded within 20 s, took " + took)
+  ok(ev("board.viaCurlUntil > Date.now()"), "fresh connections (curl) after the hung requests")
+})
+
+test("requests through curl work like the board's own", async () => {
+  await fresh()
+  ev("board.viaCurlUntil = Date.now() + 600000")
+  ev("m('refresh').refresh()")
+  await waitFor(() => ev("board.pending") === 0 && !ev("board.loadingTeam"), 10000, "a refresh through curl")
+  ok((await serverLog()).filter(e => e.op === "Issues").length >= 2, "issues loaded again")
+  ev("m('moveIssue').moveIssue('issue-3', 'state-started', 0)")
+  await waitFor(async () => (await record("Issue", "issue-3")).stateId === "state-started", 5000, "a move through curl")
+  await ctl("fault", { match: "^IssueUpdate$", kind: "status", status: 400,
+    body: { errors: [{ message: "x", extensions: { code: "INVALID_INPUT", userPresentableMessage: "This issue was deleted." } }] } })
+  ev("m('moveIssue').moveIssue('issue-3', 'state-unstarted', 0)")
+  await waitFor(() => /deleted/.test(toast()), 5000, "Linear's refusal through curl")
+  await waitFor(() => stateOf("issue-3") === "state-started", 5000, "the rollback")
+  await ctl("fault", { match: "^IssueUpdate$", kind: "drop" })
+  ev("m('moveIssue').moveIssue('issue-3', 'state-unstarted', 0)")
+  await waitFor(() => outbox() === 1, 5000, "a lost connection through curl goes to the outbox")
+  ev("m('flushOutbox').flushOutbox()")
+  await waitFor(() => outbox() === 0, 5000, "sent later")
+  await ctl("fault", { match: "^Inbox$", kind: "garbage" })
+  ev("m('loadInbox').loadInbox()")
+  await waitFor(() => inboxState().error !== "", 5000, "a broken answer through curl")
+  await ctl("fault", { match: "^Inbox$", kind: "ratelimit", resetMs: 4000 })
+  ev("m('loadInbox').loadInbox()")
+  await waitFor(() => ev("board.rateLimitedUntil") > Date.now(), 5000, "the rate limit through curl")
+  ok(!/TypeError|ReferenceError/.test(shellLog()), "QML errors:\n" + shellLog())
 })
 
 test("a wrong key shows the setup screen; the bar says not connected", async () => {

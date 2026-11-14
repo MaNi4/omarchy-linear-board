@@ -246,16 +246,34 @@ Item {
 
   // Load the team's columns, labels, projects, members, cycles and issues,
   // then apply them all at once so the board does not flicker.
-  function loadTeam() {
+  // Loading a team that failed because Linear could not be reached (no
+  // network yet after waking, a dead connection) is tried again a few times.
+  readonly property var teamRetryDelays: [2000, 5000, 10000]
+  Timer {
+    id: teamRetry
+    property int attempt: 0
+    property int forSeq: 0
+    onTriggered: if (forSeq === root.teamSeq) sync.loadTeam(attempt)
+  }
+
+  function loadTeam(attempt) {
+    attempt = attempt || 0
     var teamId = root.config.teamId
     if (!teamId) { root.team = null; root.issues = []; return }
     var seq = ++root.teamSeq
     var edits = root.editSeq
     root.loadingTeam = true
     var got = {}, left = 8, failed = false
-    var fail = function(msg) {
+    var fail = function(msg, status) {
       if (seq !== root.teamSeq || failed) return
       failed = true
+      if (status === 0 && attempt < sync.teamRetryDelays.length) {
+        teamRetry.attempt = attempt + 1
+        teamRetry.forSeq = seq   // a newer load (another team) cancels the retry
+        teamRetry.interval = sync.teamRetryDelays[attempt]
+        teamRetry.restart()
+        return
+      }
       root.loadingTeam = false
       notices.notify(msg, true)
     }

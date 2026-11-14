@@ -602,6 +602,29 @@ assert.strictEqual(L.fileDeleted({}), false)
   assert.strictEqual(L.createdLookup(L.M_COMMENT_CREATE).field, "comment")
   assert.strictEqual(L.createdLookup(L.M_ISSUE_UPDATE), null)
 }
+// After a suspend, requests from just before waking to a minute after give up sooner.
+assert.strictEqual(L.wokeUp(1000, 3000), false)
+assert.strictEqual(L.wokeUp(1000, 40000), true)
+assert.strictEqual(L.wokeUp(0, 40000), false)
+assert.strictEqual(L.requestTimeout(100000, 0), 30000)
+assert.strictEqual(L.requestTimeout(100000, 102000), 8000)      // started 2 s before the wake was noticed
+assert.strictEqual(L.requestTimeout(150000, 102000), 8000)
+assert.strictEqual(L.requestTimeout(170000, 102000), 30000)     // more than a minute after
+assert.strictEqual(L.requestTimeout(90000, 102000), 30000)      // long before
+// Requests through curl: the config it reads from stdin, and what it printed.
+{
+  const q = v => '"' + String(v).replace(/[\r\n]/g, "").replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"'
+  const conf = L.curlConfig("https://api.linear.app/graphql", "lin_api_k", '{"query":"q","variables":{"t":"a\\nb \\"c\\""}}', q)
+  assert.match(conf, /^url = "https:\/\/api\.linear\.app\/graphql"$/m)
+  assert.match(conf, /^header = "Authorization: lin_api_k"$/m)
+  assert.match(conf, /^data-binary = "\{\\"query\\":\\"q\\"/m)
+  assert.match(conf, /^write-out = "\\\\n%\{http_code\}"$/m)
+  assert.ok(!/@/.test(conf.split("\n").find(l => /^data-binary/.test(l)).slice(15, 16)), "the body is never read as a file")
+  assert.deepStrictEqual(plain(L.curlResult(0, '{"data":{}}\n200')), { status: 200, body: '{"data":{}}' })
+  assert.deepStrictEqual(plain(L.curlResult(0, 'line1\nline2\n401')), { status: 401, body: "line1\nline2" })
+  assert.deepStrictEqual(plain(L.curlResult(28, "")), { status: 0, body: "" })        // timed out
+  assert.deepStrictEqual(plain(L.curlResult(0, "no code")), { status: 0, body: "" })
+}
 // Only a server on this machine may stand in for Linear's API.
 assert.strictEqual(L.endpointFor(""), L.ENDPOINT)
 assert.strictEqual(L.endpointFor("http://127.0.0.1:47123/graphql"), "http://127.0.0.1:47123/graphql")

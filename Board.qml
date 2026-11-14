@@ -311,18 +311,34 @@ Item {
   // Requests still waiting for Linear: { xhr, at, finish }. A connection left
   // over from before a suspend can hang forever without an error, and then
   // the board stays on "Loading…"; requestWatchdog gives up on it instead.
-  readonly property int requestTimeoutMs: 30000
   property var inflight: []
 
   Timer {
     id: requestWatchdog
-    interval: 5000
+    interval: 2000
     repeat: true
     running: root.inflight.length > 0
     onTriggered: {
       var now = Date.now()
-      root.inflight.filter(function(r) { return now - r.at > root.requestTimeoutMs })
+      root.inflight.filter(function(r) { return now - r.at > Linear.requestTimeout(r.at, root.wokeAt) })
         .forEach(function(r) { r.finish(true) })
+    }
+  }
+
+  // A suspend shows as a gap between ticks. Right after waking, requests on
+  // connections from before it hang (6 of them block all the rest), so for a
+  // minute they are given up on sooner; what failed is then tried again on
+  // fresh connections.
+  property double wokeAt: 0
+  property double lastTick: Date.now()
+  Timer {
+    interval: 2000
+    repeat: true
+    running: true
+    onTriggered: {
+      var now = Date.now()
+      if (Linear.wokeUp(root.lastTick, now)) root.wokeAt = now
+      root.lastTick = now
     }
   }
 
@@ -335,26 +351,33 @@ Item {
     else notices.notify(msg, true)
   }
 
+  // Qt does not close a connection when a request on it is given up: the
+  // next request reuses it and hangs too, until the system drops it (up to
+  // ~15 minutes after a suspend or a network change). So after a request was
+  // given up on, requests go through curl (a fresh connection each) for a
+  // while; then the board tries its own connections again.
+  readonly property int curlAfterTimeoutMs: 15 * 60000
+  property double viaCurlUntil: 0
+
   function gqlWith(key, query, variables, ok, fail) {
     if (Date.now() < root.rateLimitedUntil) {
       var wait = "Linear's rate limit was reached. Trying again after " + Qt.formatTime(new Date(root.rateLimitedUntil), "HH:mm") + "."
       Qt.callLater(function() { if (root) root.failRequest(fail, wait, 429) })
       return
     }
-    var xhr = new XMLHttpRequest()
-    var req = { xhr: xhr, at: Date.now(), finish: null }
+    var viaCurl = Date.now() < root.viaCurlUntil
+    var req = { at: Date.now(), finish: null, abort: null }
     var done = false
     root.pending++
     root.inflight = root.inflight.concat([req])
-    req.finish = function(timedOut) {
+    // status 0: no answer. header(name) reads a response header.
+    var settle = function(status, text, header, timedOut) {
       if (done || !root) return   // !root: the board was unloaded (shell restart) while this was in flight
       done = true
       root.inflight = root.inflight.filter(function(r) { return r !== req })
       root.pending = Math.max(0, root.pending - 1)
-      if (timedOut) xhr.abort()
-      var status = timedOut ? 0 : xhr.status
       var body = null
-      if (!timedOut) try { body = JSON.parse(xhr.responseText) } catch (e) { body = null }
+      if (status > 0) try { body = JSON.parse(text) } catch (e) { body = null }
       if (status === 200 && body && body.data && !body.errors) {
         // A handler that throws (an answer of an unexpected shape) is
         // reported like a failed request, so nothing waits for it forever.
@@ -363,23 +386,69 @@ Item {
           root.failRequest(fail, "Linear's answer could not be read.", -1)
         }
       } else {
-        if (!timedOut && Linear.isRateLimited(body, status)) {
+        if (status > 0 && Linear.isRateLimited(body, status)) {
           status = 429
-          root.rateLimitedUntil = Linear.rateLimitUntil(xhr.getResponseHeader("X-RateLimit-Requests-Reset"),
-            xhr.getResponseHeader("Retry-After"), Date.now())
+          root.rateLimitedUntil = Linear.rateLimitUntil(header("X-RateLimit-Requests-Reset"), header("Retry-After"), Date.now())
         }
         var msg = timedOut ? "Linear did not answer. Check your connection and try again." : Linear.errorMessage(body, status)
         if (status === 401 || /authenticat/i.test(msg)) sync.keyRejected(key, msg)
         root.failRequest(fail, msg, status)
       }
     }
+    req.finish = function(timedOut) {
+      if (done) return
+      if (timedOut && !viaCurl) {
+        root.viaCurlUntil = Date.now() + root.curlAfterTimeoutMs
+        console.warn("linear-board: a request to Linear hung; using fresh connections (curl) for the next " + (root.curlAfterTimeoutMs / 60000) + " minutes")
+      }
+      settle(0, "", null, true)
+      if (req.abort) req.abort()
+    }
+    var payload = JSON.stringify({ query: query, variables: variables || {} })
+    if (viaCurl) {
+      var proc = curlRequest.createObject(root, { config: Linear.curlConfig(root.endpoint, key, payload, uploads.curlQuote) })
+      proc.done.connect(function(status, text) { settle(status, text, function() { return null }, false) })
+      req.abort = function() { if (proc) proc.running = false }
+      proc.running = true
+      return
+    }
+    var xhr = new XMLHttpRequest()
+    req.abort = function() { xhr.abort() }
     xhr.onreadystatechange = function() {
-      if (xhr.readyState === XMLHttpRequest.DONE) req.finish(false)
+      if (xhr.readyState === XMLHttpRequest.DONE) settle(xhr.status, xhr.responseText, function(n) { return xhr.getResponseHeader(n) }, false)
     }
     xhr.open("POST", root.endpoint)
     xhr.setRequestHeader("Content-Type", "application/json")
     xhr.setRequestHeader("Authorization", key)
-    xhr.send(JSON.stringify({ query: query, variables: variables || {} }))
+    xhr.send(payload)
+  }
+
+  // One request through curl. The key and the body go in as a config on
+  // stdin, never as arguments anyone can list. done(status, body): status
+  // is 0 when curl got no answer.
+  Component {
+    id: curlRequest
+    Process {
+      id: curlProc
+      property string config: ""
+      property bool exited: false
+      property bool read: false
+      property int exitCode: 0
+      signal done(int status, string text)
+      command: ["curl", "-K", "-"]
+      stdinEnabled: true
+      onStarted: { curlProc.write(curlProc.config); curlProc.config = ""; stdinEnabled = false }
+      stdout: StdioCollector {
+        onStreamFinished: { curlProc.read = true; curlProc.finishIfDone() }
+      }
+      onExited: function(code) { curlProc.exitCode = code; curlProc.exited = true; curlProc.finishIfDone() }
+      function finishIfDone() {
+        if (!curlProc.exited || !curlProc.read) return
+        var r = Linear.curlResult(curlProc.exitCode, curlProc.stdout.text)
+        curlProc.done(r.status, r.body)
+        Qt.callLater(function() { curlProc.destroy() })
+      }
+    }
   }
 
   function gql(query, variables, ok, fail) {

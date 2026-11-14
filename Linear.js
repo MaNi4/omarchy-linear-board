@@ -836,6 +836,31 @@ function isRateLimited(response, status) {
   return !!(errors && errors.some(function(e) { return e && e.extensions && e.extensions.code === "RATELIMITED" }))
 }
 
+// A request through curl (see Board.qml): its config, read from stdin, and
+// what it printed. quote() quotes a value for a curl config.
+function curlConfig(url, key, body, quote) {
+  return ["url = " + quote(url), "request = POST", "header = " + quote("Content-Type: application/json"),
+    "header = " + quote("Authorization: " + key), "data-binary = " + quote(body), "max-time = 25", "silent", "show-error",
+    "write-out = " + quote("\\n%{http_code}")].join("\n") + "\n"
+}
+function curlResult(exitCode, out) {
+  var text = String(out || "")
+  var i = text.lastIndexOf("\n")
+  var status = i >= 0 ? parseInt(text.slice(i + 1), 10) : NaN
+  if (exitCode !== 0 || !(status > 0)) return { status: 0, body: "" }
+  return { status: status, body: text.slice(0, i) }
+}
+
+// After a suspend (a gap of more than 30 s between 2 s ticks), requests
+// started from just before waking to a minute after it are given up on after
+// 8 s instead of 30 s: connections from before the suspend never answer.
+var REQUEST_TIMEOUT_MS = 30000
+var AFTER_WAKE_TIMEOUT_MS = 8000
+function wokeUp(lastTickMs, nowMs) { return lastTickMs > 0 && nowMs - lastTickMs > 30000 }
+function requestTimeout(startedMs, wokeAtMs) {
+  return wokeAtMs > 0 && startedMs > wokeAtMs - 5000 && startedMs < wokeAtMs + 60000 ? AFTER_WAKE_TIMEOUT_MS : REQUEST_TIMEOUT_MS
+}
+
 // When to try again, in ms since epoch: Linear's X-RateLimit-Requests-Reset
 // header (ms since epoch), or Retry-After (seconds), else a minute. Never
 // longer than an hour, whatever the header says.
