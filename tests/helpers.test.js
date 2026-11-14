@@ -205,6 +205,9 @@ assert.deepStrictEqual(plain(pub.map(n => [n.groupingKey, n.title, n.subtitle, n
   ["project#pr", "Shop", "New project update", 1],
   ["p4", "Linear", "Something new later", 1]])
 assert.strictEqual(L.inboxEventsText(pub[0]), "also: Status changed")
+// the full name, like Linear's own subtitles; a bot by its name
+assert.strictEqual(L.toNotification({ id: "n", type: "issueMention", actor: { name: "Ann Smith", displayName: "ann" } }).subtitle, "Mentioned you by Ann Smith")
+assert.strictEqual(L.toNotification({ id: "n", type: "issueMention", botActor: { name: "Sentry" } }).subtitle, "Mentioned you by Sentry")
 // Linear's own texts win, also an empty subtitle
 assert.strictEqual(L.toNotification({ id: "x", subtitle: "", title: "T", groupingKey: "g", type: "issueMention" }).subtitle, "")
 assert.strictEqual(L.toNotification(null).title, "Linear")

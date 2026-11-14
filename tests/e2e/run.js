@@ -91,6 +91,11 @@ async function startBoard(opts) {
     fs.mkdirSync(path.join(FILES, "config", "omarchy-linear-board"), { recursive: true })
     fs.writeFileSync(path.join(FILES, "config", "omarchy-linear-board", "config.json"), opts.config)
   }
+  if (opts.time) {
+    // The time tracker's file, where the board keeps it by default.
+    fs.mkdirSync(path.join(FILES, "data", "omarchy-linear-board"), { recursive: true })
+    fs.writeFileSync(path.join(FILES, "data", "omarchy-linear-board", "time.json"), opts.time)
+  }
   const e = env(opts.env)
   if (opts.noEnvKey) delete e.LINEAR_API_KEY
   shell = spawn("dbus-run-session", ["--", "quickshell", "-n", "-p", SHELL], { env: e, stdio: ["ignore", "pipe", "pipe"], detached: true })
@@ -323,8 +328,8 @@ test("Linear stops answering the internal inbox fields: the public ones are used
   const s = inboxState()
   eq(s.error, "", "error")
   eq(s.unread, 4, "unread counted from the rows (Linear's own count is gone)")
-  // Made up from the type and the actor's display name.
-  eq(s.items.map(i => i.subtitle).sort(), ["Marked urgent by alex", "Mentioned you by alex", "New project update by alex", "Status changed by Sentry"], "made-up subtitles")
+  // Made up from the type and the actor's full name.
+  eq(s.items.map(i => i.subtitle).sort(), ["Marked urgent by Alex Other", "Mentioned you by Alex Other", "New project update by Alex Other", "Status changed by Sentry"], "made-up subtitles")
 })
 
 test("an inbox check that never comes back is given up", async () => {
@@ -435,6 +440,19 @@ test("an invalid config.json: defaults, still works", async () => {
   await fresh({ config: "{ not json" })
   eq(ev("board.mode"), "board", "mode")
   await waitFor(() => /config\.json is not valid JSON/.test(shellLog()), 5000, "a warning in the log")
+})
+
+test("inbox.json is written only when something changed", async () => {
+  await fresh({ time: JSON.stringify({ version: 1, running: null, entries: [] }) })
+  const file = path.join(RUN, "omarchy-linear-board", "inbox.json")
+  const before = fs.statSync(file).mtimeMs, text = fs.readFileSync(file, "utf8")
+  await sleep(25000)   // the time file is re-read every 10 s meanwhile
+  eq(fs.statSync(file).mtimeMs, before, "inbox.json untouched")
+  eq(fs.readFileSync(file, "utf8"), text, "same content")
+  // A real change is written at once.
+  await ctl("notify", { issueId: "issue-2", groupingKey: "issue#issue-2" })
+  ev("m('loadInbox').loadInbox()")
+  await waitFor(() => inboxState().unread === 6, 5000, "the new count")
 })
 
 test("the bar: stale state, an older board, broken file", async () => {

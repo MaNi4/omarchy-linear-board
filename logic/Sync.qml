@@ -128,12 +128,13 @@ Item {
     })
   }
 
-  // Sent changes whose older values may still land: checked in Linear
-  // twice (the network can deliver the old request a while later).
+  // Sent changes whose older values may still land: checked in Linear a few
+  // times. The system keeps retrying an unsent request after the network is
+  // back, waiting up to 2 minutes between tries, so the last check is later.
   property var checks: []
   function checkLater(item) {
     var now = Date.now()
-    ;[15000, 60000].forEach(function(after) {
+    ;[15000, 60000, 180000].forEach(function(after) {
       sync.checks = sync.checks.concat([{ id: item.variables.id, input: item.variables.input, stale: item.stale, at: now + after }])
     })
   }

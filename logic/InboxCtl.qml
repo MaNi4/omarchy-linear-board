@@ -148,13 +148,20 @@ Item {
       return { title: n.title, subtitle: n.subtitle, identifier: n.identifier }
     })
     var r = timeTracker.timeData.running
-    privateFiles.write(inboxFile, JSON.stringify({ connected: !!root.apiKey, unread: inboxCtl.unreadCount, items: unread,
+    var state = { connected: !!root.apiKey, unread: inboxCtl.unreadCount, items: unread,
       startedAt: inboxCtl.startedAt, checkedAt: inboxCtl.checkedAt, error: inboxCtl.lastError,
       timer: r ? { identifier: r.identifier, title: r.title, startedAt: r.startedAt, projectName: r.projectName || "",
         projectCode: r.projectId && root.projectById(r.projectId) ? root.codeFor(r.projectId)
-          : (r.projectName ? Issues.projectCode({ id: r.projectId || "", name: r.projectName }, root.config.projectCodes) : "") } : null,
-      updatedAt: new Date().toISOString() }) + "\n")
+          : (r.projectName ? Issues.projectCode({ id: r.projectId || "", name: r.projectName }, root.config.projectCodes) : "") } : null }
+    // Only when something changed (the time file is re-read every few
+    // seconds and calls this each time).
+    var same = JSON.stringify(state)
+    if (same === inboxCtl.lastWritten) return
+    inboxCtl.lastWritten = same
+    state.updatedAt = new Date().toISOString()
+    privateFiles.write(inboxFile, JSON.stringify(state) + "\n")
   }
+  property string lastWritten: ""
 
   // Desktop notifications for new unread ones; a summary when many arrive at once.
   function announce(fresh) {

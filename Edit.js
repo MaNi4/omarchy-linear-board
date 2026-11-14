@@ -114,7 +114,7 @@ function outboxJoins(last, query, variables, flushing, updateQuery) {
 // A change given up on after a timeout may still reach Linear later (the
 // network sends what it already had once it is back), after the newer
 // values the outbox sent. Such inputs are kept as "stale" with the waiting
-// change; a little after it is sent, Linear is checked: a field that holds
+// change; after it is sent, Linear is checked (15 s, 1 and 3 minutes later): a field that holds
 // a stale value instead of the newer one gets the newer one again.
 var REASSERT_FIELDS = { stateId: "state", assigneeId: "assignee", projectId: "project", cycleId: "cycle", parentId: "parent",
   projectMilestoneId: "projectMilestone" }

@@ -631,8 +631,10 @@ function toNotification(raw) {
   // Linear's own grouping key is "issue#<id>"; the same is made up without it.
   var groupingKey = raw.groupingKey || (issue && issue.id ? "issue#" + issue.id : (raw.project && raw.project.id ? "project#" + raw.project.id : raw.id))
   var title = raw.title || (issue && issue.title) || (raw.project && raw.project.name) || "Linear"
+  // Made up like Linear's own ("Assigned to you by Jane Doe"): the full name.
+  var byName = raw.actor ? (raw.actor.name || raw.actor.displayName || "") : actor
   var subtitle = raw.subtitle !== undefined && raw.subtitle !== null ? String(raw.subtitle)
-    : notificationText(raw.type) + (actor ? " by " + actor : "")
+    : notificationText(raw.type) + (byName ? " by " + byName : "")
   return {
     id: raw.id, ids: [raw.id], count: 1, events: [{ subtitle: subtitle, createdAt: raw.createdAt || "" }], groupingKey: groupingKey, type: raw.type || "", title: title, subtitle: subtitle,
     createdAt: raw.createdAt || "", read: !!raw.readAt, snoozedUntil: raw.snoozedUntilAt || "",
