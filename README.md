@@ -115,8 +115,16 @@ Without a key, the same as a command (e.g. for your own binding):
 - `logic/`: what happens: `EditorState` (the issue being edited, id `ed`), `Notices` (toasts and desktop notifications, id `notices`), `Sync` (offline outbox, loading), `TimeTracker` (also the time report's state), `SharedFolder` (the shared folder, export and import), `InboxCtl` (also the inbox state), `Lists` (also the search state), `Undoer`, `IssueOps`, `EditorOps`, `Uploads`, `Workspace`, `Commands`, `ProjectOps`, `Pickers` (also the open picker and the confirmation box), `Bulk` (also drag and drop), `Keyboard`. `Board.qml` keeps what the whole board shares: the connection, the team's data, the filters, the cursor and the theme.
 - `bin/linear-notify`: sends desktop notifications over D-Bus. It reads them on stdin, so issue titles and inbox text never show up in process listings (they would with `notify-send` arguments). A click runs its action through Omarchy's notifications (`omarchy-exec-argv`), also later from the notification history.
 - `Linear.js`: only what the board says to Linear's API and how it reads the answers (queries, mutations, filters, inputs, Linear's fixed values, errors).
-- What the board does on top of Linear, as pure helpers: `Issues.js` (columns, filters, search, sorting, moving cards, project codes, copying), `Edit.js` (what an edit sends and what undoes it), `Recur.js` (recurring issues), `Inbox.js` (inbox filter), `Markdown.js` (checklists, images, mentions), `Dates.js`.
+- What the board does on top of Linear, as pure helpers: `Issues.js` (columns, filters, search, sorting, moving cards, project codes, copying), `Edit.js` (what an edit sends and what undoes it), `Recur.js` (recurring issues), `Inbox.js` (inbox filter, paging, the bar's view of the inbox state), `Markdown.js` (checklists, images, mentions), `Dates.js`.
 - `Time.js` (time tracker data), `Shared.js` (shared settings, export and import), `Help.js` (shortcut help), `Hotkey.js` and `Service.qml` (the global keys), `BarWidget.qml` (bar badge and timer).
+
+When things go wrong:
+
+- The inbox is checked every minute. A check that never comes back is given up after 5 minutes, and an answer that cannot be read does not stop the next checks. When the bar's count is more than 5 minutes old, its icon dims and the tooltip says since when and why.
+- After a plugin reload an old board can still be running; the bar follows the one that started last.
+- The inbox uses fields Linear marks internal (unread count, grouping, titles). Should Linear turn them off, the inbox switches to its public fields and makes them up the same way (newest 200 notifications).
+- Linear's rate limit: no request goes out until Linear's reset time (at most an hour), and changes wait in the outbox meanwhile.
+- A list cut off by the page limit says so instead of looking complete.
 
 Every file in `ui/` and `logic/` is created inside `Board.qml` (the editor's parts inside `IssueEditor.qml`) and reaches the board through the id `root` and the other parts through their ids (`editor`, `issueOps`…).
 

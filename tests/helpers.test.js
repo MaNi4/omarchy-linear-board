@@ -193,6 +193,68 @@ const ev = L.toInbox([{ id: "a", groupingKey: "g", createdAt: "2", subtitle: "As
   { id: "b", groupingKey: "g", createdAt: "1", subtitle: "Priority set as urgent by Sentry" }], "9")
 assert.strictEqual(L.inboxEventsText(ev[0]), "also: Priority set as urgent")
 
+// inbox without Linear's internal fields (Q_INBOX_PUBLIC): made up the same way
+const pub = L.toInbox([
+  { id: "p1", type: "issueAssignedToYou", createdAt: "3", actor: { displayName: "ann" }, issue: { id: "i9", title: "Fix login", identifier: "ENG-9" } },
+  { id: "p2", type: "issueStatusChanged", createdAt: "2", readAt: "r", issue: { id: "i9", title: "Fix login" } },
+  { id: "p3", type: "projectUpdateCreated", createdAt: "1", project: { id: "pr", name: "Shop", url: "pu" } },
+  { id: "p4", type: "somethingNewLater", createdAt: "0" }
+], "9")
+assert.deepStrictEqual(plain(pub.map(n => [n.groupingKey, n.title, n.subtitle, n.ids.length])), [
+  ["issue#i9", "Fix login", "Assigned to you by ann", 2],
+  ["project#pr", "Shop", "New project update", 1],
+  ["p4", "Linear", "Something new later", 1]])
+assert.strictEqual(L.inboxEventsText(pub[0]), "also: Status changed")
+// Linear's own texts win, also an empty subtitle
+assert.strictEqual(L.toNotification({ id: "x", subtitle: "", title: "T", groupingKey: "g", type: "issueMention" }).subtitle, "")
+assert.strictEqual(L.toNotification(null).title, "Linear")
+assert.strictEqual(L.notificationText("issueMention"), "Mentioned you")
+assert.strictEqual(L.notificationText(""), "Notification")
+assert.strictEqual(L.internalFieldsGone('Cannot query field "notificationsUnreadCount" on type "Query".'), true)
+assert.strictEqual(L.internalFieldsGone('Cannot query field "inboxUrl" on type "Notification".'), true)
+assert.strictEqual(L.internalFieldsGone('Cannot query field "identifier" on type "Issue".'), false)
+assert.strictEqual(L.internalFieldsGone("Cannot reach Linear."), false)
+
+// paging the inbox, a lost check, the bar's view of inbox.json
+assert.strictEqual(L.enoughUnread(pub, 1), true)
+assert.strictEqual(L.enoughUnread(pub, 4), false)
+assert.strictEqual(L.enoughUnread(pub, 0), true)
+assert.strictEqual(L.enoughUnread(pub, -1), false)   // no count: never stops early
+assert.strictEqual(L.loadStuck(0, 1e12), false)
+assert.strictEqual(L.loadStuck(1e12, 1e12 + L.LOAD_GIVE_UP_MS), false)
+assert.strictEqual(L.loadStuck(1e12, 1e12 + L.LOAD_GIVE_UP_MS + 1), true)
+{
+  const now = Date.parse("2026-11-14T12:00:00Z")
+  const at = min => new Date(now - min * 60000).toISOString()
+  assert.deepStrictEqual(plain(L.barHealth(null, now)), { stale: false, note: "" })
+  assert.deepStrictEqual(plain(L.barHealth({ connected: false }, now)), { stale: false, note: "" })
+  assert.deepStrictEqual(plain(L.barHealth({ connected: true, checkedAt: at(1) }, now)), { stale: false, note: "" })
+  assert.deepStrictEqual(plain(L.barHealth({ connected: true, checkedAt: at(1), error: "Cannot reach Linear." }, now)),
+    { stale: false, note: "Last check failed: Cannot reach Linear." })
+  assert.deepStrictEqual(plain(L.barHealth({ connected: true, checkedAt: at(12) }, now)), { stale: true, note: "Not updated for 12 min" })
+  assert.deepStrictEqual(plain(L.barHealth({ connected: true, checkedAt: at(180), error: "x" }, now)), { stale: true, note: "Not updated for 3 h: x" })
+  // an older board (before this version) wrote no times
+  assert.strictEqual(L.barHealth({ connected: true }, now).stale, true)
+  assert.deepStrictEqual(plain(L.barHealth({ connected: true, startedAt: at(1) }, now)), { stale: false, note: "Loading the inbox…" })
+  assert.strictEqual(L.barHealth({ connected: true, startedAt: at(20) }, now).stale, true)
+  assert.strictEqual(L.newerWriter({ startedAt: at(5) }, ""), true)
+  assert.strictEqual(L.newerWriter({ startedAt: at(5) }, at(1)), false)
+  assert.strictEqual(L.newerWriter({ startedAt: at(1) }, at(5)), true)
+  assert.strictEqual(L.newerWriter({}, at(5)), true)
+}
+
+// rate limit
+assert.strictEqual(L.isRateLimited(null, 429), true)
+assert.strictEqual(L.isRateLimited({ errors: [{ message: "x", extensions: { code: "RATELIMITED" } }] }, 400), true)
+assert.strictEqual(L.isRateLimited({ errors: [{ message: "x" }] }, 400), false)
+assert.strictEqual(L.isRateLimited(null, 500), false)
+assert.strictEqual(L.rateLimitUntil(String(5e12), null, 1e12), 1e12 + 3600000)   // capped at an hour
+assert.strictEqual(L.rateLimitUntil(String(1e12 + 5000), null, 1e12), 1e12 + 5000)
+assert.strictEqual(L.rateLimitUntil(null, "30", 1e12), 1e12 + 30000)
+assert.strictEqual(L.rateLimitUntil("", "", 1e12), 1e12 + 60000)
+assert.strictEqual(L.rateLimitUntil("garbage", null, 1e12), 1e12 + 60000)
+assert.strictEqual(L.errorMessage(null, 429), "Linear's rate limit was reached. Trying again in a while.")
+
 // sorting and grouping
 const vi = [
   { id: "a", priority: 0, sortOrder: 1, dueDate: "", updatedAt: "1", createdAt: "3", labelIds: [], assignee: null, projectId: "" },
@@ -501,6 +563,15 @@ assert.strictEqual(L.fileDeleted({}), false)
   const grown = E.mergeUndo(step, [{ id: "i1", input: { title: "Newer", description: "Text" } }, { id: "i2", input: { priority: 2 } }])
   assert.deepStrictEqual(plain(grown), [{ id: "i1", input: { title: "Old", description: "Text" } }, { id: "i2", input: { priority: 2 } }])
   assert.deepStrictEqual(plain(step), [{ id: "i1", input: { title: "Old" } }])   // the old list is not changed
+  // The offline outbox joins updates of one issue in a row, nothing else.
+  const U = "mutation IssueUpdate", wait = { query: U, variables: { id: "i1", input: { title: "A" } } }
+  assert.strictEqual(E.outboxJoins(wait, U, { id: "i1", input: { title: "B" } }, false, U), true)
+  assert.strictEqual(E.outboxJoins(wait, U, { id: "i1", input: { title: "B" } }, true, U), false)    // being sent
+  assert.strictEqual(E.outboxJoins(wait, U, { id: "i2", input: { title: "B" } }, false, U), false)   // another issue
+  assert.strictEqual(E.outboxJoins(wait, "mutation Other", { id: "i1", input: {} }, false, U), false)
+  assert.strictEqual(E.outboxJoins({ query: "mutation Other", variables: wait.variables }, "mutation Other", wait.variables, false, U), false)
+  assert.strictEqual(E.outboxJoins(undefined, U, wait.variables, false, U), false)
+  assert.strictEqual(E.outboxJoins(wait, U, { id: "i1" }, false, U), false)
   // Two sends of one issue as one: the later values win.
   assert.deepStrictEqual(plain(E.mergeInput({ title: "A", priority: 1 }, { title: "B" })), { title: "B", priority: 1 })
 }

@@ -102,6 +102,15 @@ function mergeInput(first, later) {
   return out
 }
 
+// Offline outbox: can a change join the last waiting one? Only updates of
+// the same issue (typing while offline), and not while the last one is
+// already being sent. `updateQuery` is Linear.M_ISSUE_UPDATE.
+function outboxJoins(last, query, variables, flushing, updateQuery) {
+  return !!(last && !flushing && query === updateQuery && last.query === query
+    && last.variables && variables && last.variables.id === variables.id
+    && last.variables.input && variables.input)
+}
+
 // ---- cycles ----
 
 // A cycle date typed as YYYY-MM-DD (already parsed): same time of day as

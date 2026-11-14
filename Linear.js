@@ -161,10 +161,27 @@ var INBOX_SIZE = 50
 // Pages are read until every unread row Linear counts is found (unread ones
 // can be old), but never more than this.
 var INBOX_PAGES = 20
-var Q_INBOX = "query Inbox($after: String) { notificationsUnreadCount notifications(first: " + INBOX_SIZE + ", after: $after) { nodes { " +
-  "id type category groupingKey title subtitle createdAt readAt snoozedUntilAt inboxUrl actor { id name displayName } " +
+var INBOX_NODE = "id type category createdAt readAt snoozedUntilAt actor { id name displayName } botActor { name } " +
   "... on IssueNotification { issue { id identifier title url team { id name key } project { id name color } } comment { body } } " +
-  "... on ProjectNotification { project { id name color url } } } " + PAGE_INFO + " } }"
+  "... on ProjectNotification { project { id name color url } }"
+// notificationsUnreadCount, groupingKey, title, subtitle and inboxUrl are
+// [Internal] in Linear's API: hidden from its schema since 2026-11-11, still
+// answered. Should Linear turn them off, the inbox falls back to
+// Q_INBOX_PUBLIC and toNotification makes them up from the rest.
+var Q_INBOX = "query Inbox($after: String) { notificationsUnreadCount notifications(first: " + INBOX_SIZE + ", after: $after) { nodes { " +
+  "groupingKey title subtitle inboxUrl " + INBOX_NODE + " } " + PAGE_INFO + " } }"
+var Q_INBOX_PUBLIC = "query InboxPublic($after: String) { notifications(first: " + INBOX_SIZE + ", after: $after) { nodes { " +
+  INBOX_NODE + " } " + PAGE_INFO + " } }"
+// Without Linear's unread count there is no telling when every unread one
+// is in, so the fallback reads only the newest pages.
+var INBOX_PUBLIC_PAGES = 4
+var INTERNAL_INBOX_FIELDS = ["notificationsUnreadCount", "groupingKey", "title", "subtitle", "inboxUrl"]
+
+// Does this error say Linear no longer answers one of the internal inbox fields?
+function internalFieldsGone(msg) {
+  var m = /Cannot query field "(\w+)"/.exec(String(msg || ""))
+  return !!m && INTERNAL_INBOX_FIELDS.indexOf(m[1]) >= 0
+}
 var M_NOTIFICATION_UPDATE = "mutation NotificationUpdate($id: String!, $input: NotificationUpdateInput!) { " +
   "notificationUpdate(id: $id, input: $input) { success } }"
 
@@ -569,13 +586,35 @@ function estimateLabel(team, value) {
 // ---- inbox ---------------------------------------------------------------------------
 
 // Flatten a notification. Snoozed ones (until a future time) are dropped by `toInbox`.
+// What happened, for notifications that come without Linear's subtitle
+// (Q_INBOX_PUBLIC): from the type, "issueStatusChanged" -> "Status changed".
+var NOTIFICATION_TEXTS = {
+  issueAssignedToYou: "Assigned to you", issueUnassignedFromYou: "Unassigned from you", issueMention: "Mentioned you",
+  issueCommentMention: "Mentioned you in a comment", issueNewComment: "New comment", issueCommentReaction: "Reacted to a comment",
+  issueEmojiReaction: "Reacted", issueStatusChanged: "Status changed", issuePriorityUrgent: "Marked urgent",
+  issueDue: "Due soon", issueBlocking: "Blocking changed", issueCreated: "Created", issueSubscribed: "Subscribed you",
+  issueReminder: "Reminder", projectUpdateCreated: "New project update", projectUpdateMentionPrompt: "Mentioned you in an update"
+}
+
+function notificationText(type) {
+  if (NOTIFICATION_TEXTS[type]) return NOTIFICATION_TEXTS[type]
+  var words = String(type || "").replace(/^(issue|project|document|initiative|post)(?=[A-Z])/, "").replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase()
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : "Notification"
+}
+
 function toNotification(raw) {
+  raw = raw || {}
   var issue = raw.issue || null
   var project = (issue && issue.project) || raw.project || null
-  var actor = raw.actor ? (raw.actor.displayName || raw.actor.name || "") : ""
+  var actor = raw.actor ? (raw.actor.displayName || raw.actor.name || "") : (raw.botActor && raw.botActor.name ? String(raw.botActor.name) : "")
   var body = raw.comment && raw.comment.body ? String(raw.comment.body).replace(/\s+/g, " ").trim() : ""
+  // Linear's own grouping key is "issue#<id>"; the same is made up without it.
+  var groupingKey = raw.groupingKey || (issue && issue.id ? "issue#" + issue.id : (raw.project && raw.project.id ? "project#" + raw.project.id : raw.id))
+  var title = raw.title || (issue && issue.title) || (raw.project && raw.project.name) || "Linear"
+  var subtitle = raw.subtitle !== undefined && raw.subtitle !== null ? String(raw.subtitle)
+    : notificationText(raw.type) + (actor ? " by " + actor : "")
   return {
-    id: raw.id, ids: [raw.id], count: 1, events: [{ subtitle: raw.subtitle || "", createdAt: raw.createdAt || "" }], groupingKey: raw.groupingKey || raw.id, type: raw.type || "", title: raw.title || "", subtitle: raw.subtitle || "",
+    id: raw.id, ids: [raw.id], count: 1, events: [{ subtitle: subtitle, createdAt: raw.createdAt || "" }], groupingKey: groupingKey, type: raw.type || "", title: title, subtitle: subtitle,
     createdAt: raw.createdAt || "", read: !!raw.readAt, snoozedUntil: raw.snoozedUntilAt || "",
     url: issue && issue.url ? issue.url : (raw.project && raw.project.url ? raw.project.url : (raw.inboxUrl || "")), actor: actor,
     issueId: issue ? issue.id : "", identifier: issue ? issue.identifier || "" : "",
@@ -763,5 +802,24 @@ function errorMessage(response, status) {
     return String(user || e.message || "Linear returned an error")
   }
   if (status === 0) return "Cannot reach Linear. Check your connection."
+  if (status === 429) return "Linear's rate limit was reached. Trying again in a while."
   return "Linear request failed (HTTP " + status + ")"
+}
+
+// Linear answers too many requests with HTTP 429, or 400 and the error code
+// RATELIMITED (it did both over time).
+function isRateLimited(response, status) {
+  if (status === 429) return true
+  var errors = response && response.errors
+  return !!(errors && errors.some(function(e) { return e && e.extensions && e.extensions.code === "RATELIMITED" }))
+}
+
+// When to try again, in ms since epoch: Linear's X-RateLimit-Requests-Reset
+// header (ms since epoch), or Retry-After (seconds), else a minute. Never
+// longer than an hour, whatever the header says.
+function rateLimitUntil(resetHeader, retryAfterHeader, nowMs) {
+  var reset = Number(resetHeader)
+  var retry = Number(retryAfterHeader)
+  var until = reset > nowMs ? reset : (retry > 0 ? nowMs + retry * 1000 : nowMs + 60000)
+  return Math.min(until, nowMs + 3600000)
 }

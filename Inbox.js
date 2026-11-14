@@ -57,6 +57,50 @@ function newUnread(inbox, since) {
   return inbox.filter(function(n) { return !n.read && n.createdAt > since }).reverse()
 }
 
+// Paging the inbox can stop once every unread row Linear counts is in.
+// Without Linear's count (count < 0, the fallback query) it never stops early.
+function enoughUnread(rows, count) {
+  if (count < 0) return false
+  return rows.filter(function(n) { return !n.read }).length >= count
+}
+
+// A check of the inbox that has not come back for this long is given up, so
+// one lost answer cannot stop all the later checks (the request watchdog
+// gives up after 30 s per page; this covers everything else).
+var LOAD_GIVE_UP_MS = 5 * 60000
+
+function loadStuck(loadingSinceMs, nowMs) {
+  return loadingSinceMs > 0 && nowMs - loadingSinceMs > LOAD_GIVE_UP_MS
+}
+
+// The inbox is checked every minute; after this long without a good check
+// the bar says so instead of showing an old count as current.
+var STALE_MS = 5 * 60000
+
+// What the bar widget shows for the state the board wrote (inbox.json):
+// { stale, note }. note is "" when all is well.
+function barHealth(state, nowMs) {
+  if (!state || state.connected !== true) return { stale: false, note: "" }
+  var checked = state.checkedAt ? Date.parse(state.checkedAt) : NaN
+  var error = String(state.error || "")
+  if (isNaN(checked)) {
+    // Just started: the first check is on its way.
+    var started = state.startedAt ? Date.parse(state.startedAt) : NaN
+    var fresh = !isNaN(started) && nowMs - started <= STALE_MS
+    return { stale: !fresh, note: (fresh ? "Loading the inbox…" : "Inbox not loaded") + (error ? ": " + error : "") }
+  }
+  if (nowMs - checked <= STALE_MS) return { stale: false, note: error ? "Last check failed: " + error : "" }
+  var mins = Math.round((nowMs - checked) / 60000)
+  return { stale: true, note: "Not updated for " + (mins < 60 ? mins + " min" : Math.round(mins / 60) + " h") + (error ? ": " + error : "") }
+}
+
+// Of two boards writing inbox.json (an old one left over after the plugin
+// was reloaded), the bar follows the one that started last.
+function newerWriter(state, followedStartedAt) {
+  var started = String(state && state.startedAt || "")
+  return !followedStartedAt || !started || started >= followedStartedAt
+}
+
 function newestTime(inbox) {
   var t = ""
   inbox.forEach(function(n) { if (n.createdAt > t) t = n.createdAt })

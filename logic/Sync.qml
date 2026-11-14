@@ -28,18 +28,18 @@ Item {
 
   function send(label, query, variables, ok, fail) {
     root.gql(query, variables, ok, function(msg, status) {
-      if (status === 0 && root.apiKey) { sync.enqueue(label, query, variables, ok); return }
+      // Offline (0) or Linear's rate limit (429): sent later, from the outbox.
+      if ((status === 0 || status === 429) && root.apiKey) { sync.enqueue(label, query, variables, ok, status); return }
       if (fail) fail(msg, status)
       else notices.notify(msg, true)
     })
   }
 
-  function enqueue(label, query, variables, ok) {
+  function enqueue(label, query, variables, ok, status) {
     // Edits of one issue in a row (typing while offline) are one entry:
     // the later values win.
     var last = sync.outbox[sync.outbox.length - 1]
-    if (last && !sync.outboxFlushing && last.query === query && query === Linear.M_ISSUE_UPDATE && last.variables && variables
-        && last.variables.id === variables.id && last.variables.input && variables.input) {
+    if (Edit.outboxJoins(last, query, variables, sync.outboxFlushing, Linear.M_ISSUE_UPDATE)) {
       var input = Edit.mergeInput(last.variables.input, variables.input)
       var prevOk = last.ok
       var merged = { label: label, query: query, variables: { id: variables.id, input: input },
@@ -50,7 +50,8 @@ Item {
     }
     sync.outbox = sync.outbox.concat([{ label: label, query: query, variables: variables, ok: ok || null }])
     sync.saveOutbox()
-    notices.notify("Offline: " + label + " will be sent when Linear is reachable (" + sync.outbox.length + " waiting)", true)
+    notices.notify((status === 429 ? "Linear's rate limit: " + label + " will be sent in a while"
+      : "Offline: " + label + " will be sent when Linear is reachable") + " (" + sync.outbox.length + " waiting)", true)
   }
 
   function saveOutbox() {
@@ -66,12 +67,12 @@ Item {
       sync.outbox = sync.outbox.slice(1)
       sync.saveOutbox()
       sync.outboxFlushing = false
-      if (item.ok) { try { item.ok(data) } catch (e) {} }
+      if (item.ok) { try { item.ok(data) } catch (e) { console.warn("linear-board: updating the board after a waiting change failed: " + e) } }
       if (sync.outbox.length) sync.flushOutbox()
       else { notices.notify("Back online: everything was sent to Linear"); sync.loadTeam() }
     }, function(msg, status) {
       sync.outboxFlushing = false
-      if (status === 0) return   // still offline, try again later
+      if (status === 0 || status === 429) return   // still offline or rate limited, try again later
       sync.outbox = sync.outbox.slice(1)
       sync.saveOutbox()
       notices.notify("Linear refused a waiting change (" + item.label + "): " + msg, true)
@@ -102,7 +103,7 @@ Item {
           sync.outbox = list.map(function(o) { return { label: o.label, query: o.query, variables: o.variables, ok: null } })
           Qt.callLater(sync.flushOutbox)
         }
-      } catch (e) {}
+      } catch (e) { console.warn("linear-board: outbox.json could not be read, waiting changes are lost: " + e) }
     }
     onLoadFailed: applied = true
   }
@@ -152,8 +153,15 @@ Item {
         var conn = pick(data)
         if (conn) nodes = nodes.concat(conn.nodes || [])
         var info = conn && conn.pageInfo
-        if (info && info.hasNextPage && info.endCursor && ++pages < limit && !(enough && enough(nodes))) step(info.endCursor)
-        else ok(nodes)
+        var more = !!(info && info.hasNextPage && info.endCursor)
+        if (more && ++pages < limit && !(enough && enough(nodes))) { step(info.endCursor); return }
+        // Cut off by the page limit (not by `enough`): say so instead of
+        // showing part of the list as if it were all.
+        if (more && pages >= limit && !enough) {
+          console.warn("linear-board: stopped after " + limit + " pages (" + nodes.length + " items)")
+          notices.notify("Linear has more than " + nodes.length + " here; only those are shown.", true)
+        }
+        ok(nodes)
       }, fail)
     }
     step("")

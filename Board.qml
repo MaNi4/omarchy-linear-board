@@ -188,7 +188,7 @@ Item {
   // is the focused window, and otherwise brings it to the front.
   function open(payloadJson) {
     var payload = {}
-    try { payload = JSON.parse(payloadJson || "{}") || {} } catch (e) {}
+    try { payload = JSON.parse(payloadJson || "{}") || {} } catch (e) { console.warn("linear-board: ignoring a summon payload that is not JSON") }
     // The bar's timer button: stop the timer, leave the board as it is.
     if (payload.timer === "away") {
       timeTracker.removeAway(payload.from, payload.to)
@@ -325,7 +325,21 @@ Item {
     }
   }
 
+  // Linear's rate limit: until this time (ms) no request is sent; each one
+  // fails with status 429 at once, and changes wait in the outbox.
+  property double rateLimitedUntil: 0
+
+  function failRequest(fail, msg, status) {
+    if (fail) fail(msg, status)
+    else notices.notify(msg, true)
+  }
+
   function gqlWith(key, query, variables, ok, fail) {
+    if (Date.now() < root.rateLimitedUntil) {
+      var wait = "Linear's rate limit was reached. Trying again after " + Qt.formatTime(new Date(root.rateLimitedUntil), "HH:mm") + "."
+      Qt.callLater(function() { if (root) root.failRequest(fail, wait, 429) })
+      return
+    }
     var xhr = new XMLHttpRequest()
     var req = { xhr: xhr, at: Date.now(), finish: null }
     var done = false
@@ -341,12 +355,21 @@ Item {
       var body = null
       if (!timedOut) try { body = JSON.parse(xhr.responseText) } catch (e) { body = null }
       if (status === 200 && body && body.data && !body.errors) {
-        if (ok) ok(body.data)
+        // A handler that throws (an answer of an unexpected shape) is
+        // reported like a failed request, so nothing waits for it forever.
+        if (ok) try { ok(body.data) } catch (e) {
+          console.warn("linear-board: could not use Linear's answer: " + e)
+          root.failRequest(fail, "Linear's answer could not be read.", -1)
+        }
       } else {
+        if (!timedOut && Linear.isRateLimited(body, status)) {
+          status = 429
+          root.rateLimitedUntil = Linear.rateLimitUntil(xhr.getResponseHeader("X-RateLimit-Requests-Reset"),
+            xhr.getResponseHeader("Retry-After"), Date.now())
+        }
         var msg = timedOut ? "Linear did not answer. Check your connection and try again." : Linear.errorMessage(body, status)
         if (status === 401 || /authenticat/i.test(msg)) sync.keyRejected(key, msg)
-        if (fail) fail(msg, status)
-        else notices.notify(msg, true)
+        root.failRequest(fail, msg, status)
       }
     }
     xhr.onreadystatechange = function() {
@@ -482,7 +505,7 @@ Item {
           layout: c.layout === "list" ? "list" : "board",
           doneWindow: Linear.doneWindow(c.doneWindow).id
         }
-      } catch (e) {}
+      } catch (e) { console.warn("linear-board: config.json is not valid JSON, the defaults are used: " + e) }
       root.configLoaded = true
       root.loadKey()
     }

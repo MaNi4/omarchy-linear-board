@@ -29,6 +29,16 @@ Item {
   property int cursor: 0
   property string snoozeId: ""   // row showing its snooze choices
   property bool seenLoaded: false
+  // For the bar widget (inbox.json): when this board started, the last good
+  // check and the last error, so it can tell an old count from a current one.
+  property string startedAt: ""
+  property string checkedAt: ""
+  property string lastError: ""
+  property double loadingSince: 0
+  property int loadSeq: 0
+  // Linear stopped answering its internal inbox fields: use Q_INBOX_PUBLIC.
+  property bool publicOnly: false
+  Component.onCompleted: inboxCtl.startedAt = new Date().toISOString()
   // Set each time the inbox opens: from the board it starts on the board's
   // project, from the bar (or a summary notification) on everything.
   property var filter: ({ teamId: "", projectId: "", category: "" })
@@ -54,6 +64,10 @@ Item {
     triggeredOnStart: true
     running: root.keyChecked && root.apiKey !== "" && root.dirsReady && inboxCtl.seenLoaded
     onTriggered: {
+      if (inboxCtl.loading && Inbox.loadStuck(inboxCtl.loadingSince, Date.now())) {
+        console.warn("linear-board: an inbox check did not come back, starting a new one")
+        inboxCtl.loading = false
+      }
       if (!inboxCtl.loading) inboxCtl.loadInbox()
       issueOps.runRecurring()
     }
@@ -79,28 +93,52 @@ Item {
 
   function loadInbox() {
     if (!root.apiKey) return
+    var seq = ++inboxCtl.loadSeq
+    var publicOnly = inboxCtl.publicOnly
     inboxCtl.loading = true
-    var count = 0
-    sync.gqlAll(Linear.Q_INBOX, {}, function(d) { count = d.notificationsUnreadCount; return d.notifications }, function(nodes) {
-      inboxCtl.loading = false
-      var list = Linear.toInbox(nodes, new Date().toISOString())
-      var fresh = Inbox.newUnread(list, inboxCtl.since)
-      inboxCtl.items = list
-      inboxCtl.unreadCount = count
-      var newest = Inbox.newestTime(list)
-      if (newest > inboxCtl.since) {
-        inboxCtl.since = newest
-        privateFiles.write(seenFile, newest + "\n")
+    inboxCtl.loadingSince = Date.now()
+    var count = -1   // Linear's unread count; -1 without it (the fallback query)
+    var done = function() { if (seq === inboxCtl.loadSeq) inboxCtl.loading = false }
+    sync.gqlAll(publicOnly ? Linear.Q_INBOX_PUBLIC : Linear.Q_INBOX, {}, function(d) {
+      if (typeof d.notificationsUnreadCount === "number") count = d.notificationsUnreadCount
+      return d.notifications
+    }, function(nodes) {
+      if (seq !== inboxCtl.loadSeq) return   // given up on, a newer check runs
+      try {
+        var list = Linear.toInbox(nodes, new Date().toISOString())
+        var fresh = Inbox.newUnread(list, inboxCtl.since)
+        inboxCtl.items = list
+        inboxCtl.unreadCount = count >= 0 ? count : list.filter(function(n) { return !n.read }).length
+        var newest = Inbox.newestTime(list)
+        if (newest > inboxCtl.since) {
+          inboxCtl.since = newest
+          privateFiles.write(seenFile, newest + "\n")
+        }
+        inboxCtl.checkedAt = new Date().toISOString()
+        inboxCtl.lastError = ""
+        inboxCtl.clampInboxCursor()
+        if (root.config.desktopNotify) inboxCtl.announce(fresh)
+      } catch (e) {
+        // An answer of an unexpected shape must not stop the next checks.
+        console.warn("linear-board: could not read the inbox: " + e)
+        inboxCtl.lastError = "Linear's answer could not be read"
       }
-      inboxCtl.clampInboxCursor()
-      if (root.config.desktopNotify) inboxCtl.announce(fresh)
+      done()
       inboxCtl.writeInboxState()
     }, function(msg) {
-      inboxCtl.loading = false
+      if (seq !== inboxCtl.loadSeq) return
+      done()
+      if (!publicOnly && Linear.internalFieldsGone(msg)) {
+        console.warn("linear-board: Linear no longer answers the internal inbox fields, using the public ones")
+        inboxCtl.publicOnly = true
+        inboxCtl.loadInbox()
+        return
+      }
+      inboxCtl.lastError = msg
+      inboxCtl.writeInboxState()
       if (panel.visible) notices.notify("Inbox: " + msg, true)
-    }, Linear.INBOX_PAGES, function(nodes) {
-      var rows = Linear.toInbox(nodes, new Date().toISOString())
-      return rows.filter(function(n) { return !n.read }).length >= count
+    }, publicOnly ? Linear.INBOX_PUBLIC_PAGES : Linear.INBOX_PAGES, function(nodes) {
+      return Inbox.enoughUnread(Linear.toInbox(nodes, new Date().toISOString()), count)
     })
   }
 
@@ -111,6 +149,7 @@ Item {
     })
     var r = timeTracker.timeData.running
     privateFiles.write(inboxFile, JSON.stringify({ connected: !!root.apiKey, unread: inboxCtl.unreadCount, items: unread,
+      startedAt: inboxCtl.startedAt, checkedAt: inboxCtl.checkedAt, error: inboxCtl.lastError,
       timer: r ? { identifier: r.identifier, title: r.title, startedAt: r.startedAt, projectName: r.projectName || "",
         projectCode: r.projectId && root.projectById(r.projectId) ? root.codeFor(r.projectId)
           : (r.projectName ? Issues.projectCode({ id: r.projectId || "", name: r.projectName }, root.config.projectCodes) : "") } : null,

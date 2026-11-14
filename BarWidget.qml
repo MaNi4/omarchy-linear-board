@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
+import "Inbox.js" as Inbox
 
 // Bar icon for the Linear inbox with an unread count. The board overlay checks
 // Linear every minute and writes the count to a small runtime file, which this
@@ -17,6 +18,9 @@ BarWidget {
   property var items: []
   property var timer: null             // { identifier, title, startedAt } while a timer runs
   property double nowMs: Date.now()
+  property var state: null             // what the board last wrote
+  property string followed: ""         // startedAt of the board the bar follows
+  readonly property var health: Inbox.barHealth(root.state, root.nowMs)
   readonly property string statePath: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/omarchy-linear-board/inbox.json"
 
   implicitWidth: (timerButton.visible ? timerButton.implicitWidth : 0) + button.implicitWidth
@@ -25,6 +29,12 @@ BarWidget {
   function apply(raw) {
     try {
       var s = JSON.parse(raw || "{}")
+      root.nowMs = Date.now()
+      // A board left over from before a plugin reload may still write here;
+      // follow the newest one (an old one stays ignored once a newer wrote).
+      if (!Inbox.newerWriter(s, root.followed)) return
+      if (s.startedAt) root.followed = String(s.startedAt)
+      root.state = s
       root.connected = s.connected === true
       root.unread = Math.max(0, Number(s.unread) || 0)
       root.items = Array.isArray(s.items) ? s.items.slice(0, 5) : []
@@ -32,6 +42,7 @@ BarWidget {
       root.nowMs = Date.now()
     } catch (e) {
       root.connected = false
+      root.state = null
     }
   }
 
@@ -102,11 +113,12 @@ BarWidget {
     anchors.bottom: parent.bottom
     bar: root.bar
     text: String.fromCodePoint(0xF0687)
-    dimmed: !root.connected
+    dimmed: !root.connected || root.health.stale
     tooltipText: {
       if (!root.connected) return "Linear: open the board to connect"
-      if (root.unread === 0) return "Linear inbox: nothing unread"
-      var lines = [root.unread + " unread in Linear"]
+      var note = root.health.note ? "\n" + root.oneLine(root.health.note, 120) : ""
+      if (root.unread === 0) return "Linear inbox: nothing unread" + note
+      var lines = [root.unread + " unread in Linear" + note]
       root.items.forEach(function(n) {
         lines.push((n.identifier ? n.identifier + "  " : "") + root.oneLine(n.title, 70))
       })
