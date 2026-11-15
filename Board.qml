@@ -744,7 +744,7 @@ Item {
     if (Object.keys(patch).length) root.setConfig(patch)
     if (patch.projectId !== undefined) root.issues = []
     if (patch.projectId !== undefined || patch.doneWindow) sync.loadTeam()
-    notices.notify("Every issue of " + (root.team ? root.team.name : "the team") + ", done ones too. X or Ctrl+A selects, then archive (Ctrl+Shift+X) or delete. V → Completed: Past 2 weeks goes back.")
+    notices.notify("Every issue of " + (root.team ? root.team.name : "the team") + ", done ones too. Select with X or Ctrl+A, then archive (Ctrl+Shift+X) or delete. V → Completed → Past 2 weeks goes back to the usual board.")
   }
 
   function onBoard(id) {
@@ -941,7 +941,7 @@ Item {
             wrapMode: Text.WordWrap
             elide: Text.ElideNone
             opacity: 0.8
-            text: "The board shows your Linear issues by workflow state. It needs a personal API key, which stays on this machine (" + root.configDir.replace(root.home, "~") + "/api-key)."
+            text: "The board shows your Linear issues by status. It needs a personal API key, which stays on this computer (" + root.configDir.replace(root.home, "~") + "/api-key)."
           }
           Row {
             spacing: Style.spacing.lg

@@ -44,7 +44,7 @@ Rectangle {
         spacing: Style.spacing.sm
         bottomPadding: Style.spacing.md
         Chip { tip: "Accept into the backlog (A in the triage list)"; text: "Accept"; glyph: root.icon.check; strong: true; tint: root.tint("green"); onClicked: lists.triageAccept(ed.orig) }
-        Chip { tip: "Decline: cancel it (D in the triage list)"; text: "Decline"; glyph: root.icon.close; strong: true; tint: root.urgent; onClicked: lists.triageDecline(ed.orig) }
+        Chip { tip: "Decline and cancel it (D in the triage list)"; text: "Decline"; glyph: root.icon.close; strong: true; tint: root.urgent; onClicked: lists.triageDecline(ed.orig) }
       }
 
       // Properties: name on the left, the value as a pill that opens its menu.
@@ -192,7 +192,7 @@ Rectangle {
           tip: "Archive (Ctrl+Shift+X)"
           onClicked: editor.archiveOpen()
         }
-        Chip { tip: "Delete: to Linear's trash for 30 days (Ctrl+Backspace or Delete outside a text field; G then X shows the trash)"; text: "Delete"; glyph: root.icon.trash; tint: root.urgent; onClicked: editorOps.deleteIssue(ed.issueId) }
+        Chip { tip: "Move to Linear's trash for 30 days (Ctrl+Backspace, or Delete outside a text field). G then X shows the trash."; text: "Delete"; glyph: root.icon.trash; tint: root.urgent; onClicked: editorOps.deleteIssue(ed.issueId) }
       }
     }
   }

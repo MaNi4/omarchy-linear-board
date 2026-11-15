@@ -41,7 +41,7 @@ Item {
     ed.estimate = v.estimate
     ed.cycleId = v.cycleId
     ed.milestoneId = v.milestoneId
-    notices.notify("Copy of the issue: change what you need and create it")
+    notices.notify("This is a copy. Change what you need, then create it.")
   }
 
   function applyTemplate(t) {
@@ -59,7 +59,7 @@ Item {
 
   function saveAsTemplate() {
     var name = editor.titleField.text.trim()
-    if (!name) { notices.notify("Give the issue a title first; it becomes the template's name.", true); return }
+    if (!name) { notices.notify("Give the issue a title first. It becomes the template's name.", true); return }
     var data = Linear.templateDataFrom({ title: name, description: editor.descField.text, priority: ed.priority, labelIds: ed.labels,
       stateId: ed.stateId, projectId: ed.projectId, assigneeId: ed.assigneeId, estimate: ed.estimate })
     root.gql(Linear.M_TEMPLATE_CREATE, { input: { type: "issue", name: name, teamId: ed.team.id, templateData: data } }, function(d) {
@@ -233,7 +233,7 @@ Item {
     var o = ed.orig
 
     if (!o) {
-      if (ed.teamLoading) { notices.notify("Still loading the team, a moment…"); return false }
+      if (ed.teamLoading) { notices.notify("The team is still loading. Try again in a moment."); return false }
       var otherTeam = !!ed.teamData
       var teamName = ed.team.name
       var create = made.input
@@ -747,7 +747,7 @@ Item {
   // mail links are opened, never file:// or anything xdg-open could take
   // for an option.
   function openInLinear(url) {
-    if (!Markdown.openable(url)) { if (url) notices.notify("Not opened (only http, https and mailto links): " + url, true); return }
+    if (!Markdown.openable(url)) { if (url) notices.notify("Only web and email links can be opened: " + url, true); return }
     Quickshell.execDetached(["xdg-open", url])
   }
 }

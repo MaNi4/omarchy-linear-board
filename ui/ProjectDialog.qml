@@ -141,7 +141,7 @@ Rectangle {
           placeholderText: "2026-12-31"
           Keys.onReturnPressed: function(event) { projectOps.setProjectTarget(text); keyScope.forceActiveFocus(); event.accepted = true }
         }
-        Button { tooltipText: "Set the target date (Enter in the field)"; text: "Set"; onClicked: projectOps.setProjectTarget(projTargetField.text) }
+        Button { tooltipText: "Set the target date (Enter)"; text: "Set"; onClicked: projectOps.setProjectTarget(projTargetField.text) }
         Button { tooltipText: "Remove the target date"; text: "Clear"; onClicked: { projTargetField.text = ""; projectOps.setProjectTarget("") } }
         Item { Layout.fillWidth: true }
       }
@@ -187,7 +187,7 @@ Rectangle {
           placeholderText: "Target date"
           Keys.onReturnPressed: function(event) { if (projectOps.addMilestone(newMsName.text, newMsDate.text)) { newMsName.text = ""; newMsDate.text = "" } event.accepted = true }
         }
-        Button { tooltipText: "Add the milestone (Enter in the field)"; text: "Add"; iconText: root.icon.plus; bordered: true; onClicked: if (projectOps.addMilestone(newMsName.text, newMsDate.text)) { newMsName.text = ""; newMsDate.text = "" } }
+        Button { tooltipText: "Add the milestone (Enter)"; text: "Add"; iconText: root.icon.plus; bordered: true; onClicked: if (projectOps.addMilestone(newMsName.text, newMsDate.text)) { newMsName.text = ""; newMsDate.text = "" } }
       }
 
       SectionTitle { text: "Updates" }
@@ -218,7 +218,7 @@ Rectangle {
           flickable: projUpdateScroll.contentItem
           width: projUpdateScroll.availableWidth
           height: Math.max(implicitHeight, projUpdateScroll.availableHeight)
-          placeholderText: projectOps.projectEditUpdateId ? "Edit your update (Ctrl+Enter saves, Esc cancels)" : "What changed since the last update? (Markdown; Ctrl+Enter posts)"
+          placeholderText: projectOps.projectEditUpdateId ? "Edit your update (Ctrl+Enter saves, Esc cancels)" : "What changed since the last update? (Markdown, Ctrl+Enter posts)"
           wrapMode: TextEdit.Wrap
           color: root.fg
           placeholderTextColor: Util.alpha(root.fg, 0.4)

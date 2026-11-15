@@ -205,14 +205,14 @@ Item {
         else if (lt === "e") { workspace.setProject(""); workspace.clearFilters(true) }
         else if (lt === "b") bulk.jumpToType("backlog")
         else if (lt === "a") bulk.jumpToType("started")
-        else if (lt === "t") { if (lists.triageOn) lists.openTriage(); else notices.notify("This team has no triage (time report: W)") }
+        else if (lt === "t") { if (lists.triageOn) lists.openTriage(); else notices.notify("This team doesn't use triage. The time report is W.") }
         else if (lt === "y") lists.openMyIssues()
         else if (lt === "c" || lt === "v") lists.openCycles()
         else if (lt === "w") lists.openCycles("next")
         else if (lt === "x") lists.openArchived()
         else if (lt === "d") { if (root.dialog) pickers.closeDialog(); if ((root.config.layout || "board") !== "board") workspace.toggleLayout() }
         else if (lt === "u") projectOps.openProject(root.config.projectId)
-        else if (lt === "r") { if (lists.triageOn) lists.openTriage(); else notices.notify("This team has no triage") }
+        else if (lt === "r") { if (lists.triageOn) lists.openTriage(); else notices.notify("This team doesn't use triage") }
       } else if (pre === "o") {
         if (lt === "t") pickers.openPicker("team", boardScreen.teamButton.mapToItem(keyScope, 0, 0).x)
         else if (lt === "p") pickers.openPicker("project", boardScreen.projectButton.mapToItem(keyScope, 0, 0).x)

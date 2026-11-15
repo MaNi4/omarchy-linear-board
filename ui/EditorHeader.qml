@@ -62,7 +62,7 @@ RowLayout {
   Label { visible: editor.editing; text: ed.identifier; font.bold: true; opacity: 0.8 }
   Button { visible: editor.editing; text: "ID"; tooltipText: "Copy the issue ID (Ctrl+.)"; onClicked: bulk.copyIssue(ed.orig, "id") }
   Button { visible: editor.editing; text: "Branch"; tooltipText: "Copy the git branch name (Ctrl+Shift+.)"; onClicked: bulk.copyIssue(ed.orig, "branch") }
-  Button { visible: editor.editing; text: "Link"; tooltipText: "Copy the link (Ctrl+Shift+,); Markdown link: Ctrl+Alt+,"; onClicked: bulk.copyIssue(ed.orig, "url") }
+  Button { visible: editor.editing; text: "Link"; tooltipText: "Copy the link (Ctrl+Shift+,). Ctrl+Alt+, copies a Markdown link."; onClicked: bulk.copyIssue(ed.orig, "url") }
   Item { Layout.fillWidth: true }
   PropPill {
     id: templatePill

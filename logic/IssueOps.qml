@@ -59,7 +59,7 @@ Item {
       var real = idx < target.length ? full.map(function(i) { return i.id }).indexOf(target[idx].id) : full.length
       issueOps.moveIssue(issue.id, root.columns[c].id, real)
     } else {
-      if (!root.manualOrder) { notices.notify("Reordering works with manual sort (v → Sort: Manual)."); return }
+      if (!root.manualOrder) { notices.notify("To reorder cards, switch to manual sorting (V → Sort: Manual)."); return }
       var col = root.visibleByColumn[root.selCol]
       var j = root.selIdx + di
       if (j < 0 || j >= col.length) return
@@ -303,7 +303,7 @@ Item {
     vars.at = at.toISOString()
     var when = Qt.formatDateTime(at, "ddd d MMM HH:mm")
     root.gql(Linear.reminderDocument(ids.length), vars, function() {
-      notices.notify("Reminder set for " + when + ": Linear's inbox will remind you", false, root.icon.check)
+      notices.notify("Linear will remind you on " + when, false, root.icon.check)
     }, function(msg) { notices.notify("Could not set the reminder: " + msg, true) })
   }
 

@@ -130,7 +130,7 @@ Item {
   // A picker for the issues under the cursor or picked; it opens next to the
   // card (or above the bulk bar while cards are picked).
   function openActionPicker(kind) {
-    if (!bulk.actionIds().length) { notices.notify("Select a card first (arrows or click)."); return }
+    if (!bulk.actionIds().length) { notices.notify("Select a card first."); return }
     if (root.multi.length && bulkBar.visible) { pickers.openPicker(kind, bulkBar.mapToItem(keyScope, 0, 0).x, bulkBar.mapToItem(keyScope, 0, 0).y - Style.spacing.sm); return }
     if (root.listLayout) { pickers.openPicker(kind, Math.max(0, keyScope.width / 2 - Style.space(150))); return }
     var col = boardScreen.colRepeater.itemAt(root.selCol)
@@ -157,7 +157,7 @@ Item {
   function copyIssue(issue, kind) {
     if (!issue) { notices.notify("Select a card first."); return }
     var text = Issues.copyText(issue, kind)
-    if (!text) { notices.notify("Nothing to copy (reload the board)."); return }
+    if (!text) { notices.notify("Nothing to copy. Reload the board and try again."); return }
     copyProc.text = text
     copyProc.running = true
     var what = { id: "ID", branch: "git branch", url: "link", markdown: "Markdown link", title: "ID and title" }[kind] || ""
@@ -221,7 +221,7 @@ Item {
     var ids = bulk.actionIds()
     if (!ids.length) return
     var one = ids.length === 1 ? root.issueById(ids[0]) : null
-    pickers.ask("Archive " + (one ? one.identifier + " “" + one.title + "”" : ids.length + " issues") + "? Archived issues leave the board and stop counting toward the free plan's issue limit; Linear can restore them.",
+    pickers.ask("Archive " + (one ? one.identifier + " “" + one.title + "”" : ids.length + " issues") + "? Archived issues leave the board and stop counting toward the free plan's limit. Linear can restore them.",
       "Archive", function() { bulk.archiveIds(ids, one ? one.identifier : ids.length + " issues") })
   }
 

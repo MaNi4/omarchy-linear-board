@@ -72,7 +72,7 @@ Item {
       // Not there (sync not finished, disk not mounted): wait, never start
       // an empty file in its place.
       shared.writable = false
-      shared.error = "The shared settings are not at " + shared.path.replace(root.home, "~") + " yet (not synced?). Looking again every few seconds; until then changes stay on this computer."
+      shared.error = "The shared settings are not at " + shared.path.replace(root.home, "~") + " yet (not synced?). Checking again every few seconds. Until then, changes stay on this computer."
     }
   }
 

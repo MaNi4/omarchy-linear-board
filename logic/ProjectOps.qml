@@ -130,7 +130,7 @@ Item {
     projectDialog.projUpdateField.text = ""
   }
   function deleteProjectUpdate(u) {
-    pickers.ask("Delete this project update? Linear archives it; it can be restored there.", "Delete", function() {
+    pickers.ask("Delete this project update? Linear archives it, so you can restore it there.", "Delete", function() {
       var before = projectOps.projectUpdates
       projectOps.projectUpdates = projectOps.projectUpdates.filter(function(x) { return x.id !== u.id })
       if (projectOps.projectEditUpdateId === u.id) projectOps.cancelProjectUpdateEdit()

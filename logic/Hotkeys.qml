@@ -49,7 +49,7 @@ Item {
   // "" binds nothing. The service picks the file up and rebinds.
   function setHotkey(setting, value) {
     var key = value === "" ? "" : Hotkey.tidy(value)
-    if (value !== "" && !key) { notices.notify("That is not a key combination, e.g. SUPER + SHIFT + K", true); return }
+    if (value !== "" && !key) { notices.notify("That isn't a key combination. Try something like SUPER + SHIFT + K.", true); return }
     var s = hotkeys.settings.filter(function(x) { return x.id === setting })[0]
     var held = key ? Hotkey.holder(hotkeys.bindsJson, key, s ? s.description : "") : ""
     if (held) { notices.notify(key + " is already used by “" + held + "”", true); return }

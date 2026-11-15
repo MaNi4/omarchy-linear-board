@@ -129,7 +129,7 @@ Item {
     if (pickers.kind === "filter")
       return [{ id: "assignee", label: "Assignee…", hint: workspace.assigneeFilterLabel, selected: !!root.config.assignee },
         { id: "priority", label: "Priority…", hint: root.priorityFilter < 0 ? "" : Linear.priority(root.priorityFilter).label, selected: root.priorityFilter >= 0 },
-        { id: "labels", label: "Labels…", hint: root.labelFilter.length ? root.labelFilter.length + " picked" : "1 – 9", selected: root.labelFilter.length > 0 },
+        { id: "labels", label: "Labels…", hint: root.labelFilter.length ? root.labelFilter.length + " selected" : "1 – 9", selected: root.labelFilter.length > 0 },
         { id: "project", label: "Project…", hint: root.currentProject ? root.currentProject.name : "", selected: !!root.currentProject },
         { id: "cycle", label: "Cycle…", hint: root.cycleFilter ? root.cycleFilterLabel : "", selected: root.cycleFilter !== "" },
         { id: "search", label: "Text…", hint: root.query, selected: root.query !== "" },

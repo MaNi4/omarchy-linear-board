@@ -160,7 +160,7 @@ Rectangle {
   function openMore() { propMenu.openFor("more", edHeader.morePill) }
   // Ctrl+Shift+X, like the Archive chip: only for issues on the board.
   function archiveOpen() {
-    if (!root.onBoard(ed.issueId)) { notices.notify("Archive it from Linear: it is not on this board", true); return }
+    if (!root.onBoard(ed.issueId)) { notices.notify("This issue isn't on the board. Archive it in Linear.", true); return }
     var id = ed.issueId, ident = ed.identifier
     pickers.closeDialog()
     pickers.ask("Archive " + ident + "?", "Archive", function() { bulk.archiveIds([id], ident) })
@@ -297,7 +297,7 @@ Rectangle {
           flickable: descScroll.contentItem
           width: descScroll.availableWidth
           height: Math.max(implicitHeight, descScroll.availableHeight)
-          placeholderText: "Add a description…  (Markdown; paste or drop images and files)"
+          placeholderText: "Add a description… (Markdown, or paste and drop images and files)"
           wrapMode: TextEdit.Wrap
           color: root.fg
           placeholderTextColor: Util.alpha(root.fg, 0.35)
@@ -349,7 +349,7 @@ Rectangle {
         Button {
           text: "Preview"
           iconText: root.icon.eye
-          tooltipText: "Show the description as Linear will (Ctrl+Shift+P); Edit or a click goes back"
+          tooltipText: "Preview the description as Linear shows it (Ctrl+Shift+P). Click it to edit again."
           onClicked: issueOps.toggleDescPreview()
         }
         Label {

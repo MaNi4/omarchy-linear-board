@@ -82,7 +82,7 @@ Item {
     root.gql(Linear.Q_MUTATIONS, {}, function(d) {
       if (Linear.hasMutation(d, Linear.FILE_DELETE_FIELD)) { uploads.deleteSupport = "ok"; go() }
       else { uploads.deleteSupport = "gone"; notices.notify(uploads.goneText, true) }
-    }, function(msg) { notices.notify("Could not ask Linear whether files can be deleted, nothing was changed: " + msg, true) })
+    }, function(msg) { notices.notify("Nothing was changed. Linear didn't say whether the file can be deleted: " + msg, true) })
   }
 
   // Delete an uploaded image from Linear for good: take it out of the text
@@ -93,19 +93,19 @@ Item {
   }
 
   function confirmDelete(url, where) {
-    pickers.ask("Delete this image from Linear for good? It is taken out of this text and saved first, so nothing breaks here. This cannot be undone. Only places with a copy of this same image link (e.g. an issue made with Duplicate) would show it broken; an image uploaded again is a separate file and is not affected.",
+    pickers.ask("Delete this image from Linear for good? It's removed from this text first, and this can't be undone. Other places with a copy of the same image link, such as an issue made with Duplicate, will show it as broken. An image you uploaded again is a separate file and isn't affected.",
       "Delete", function() {
       var purge = function() {
         root.gql(Linear.M_FILE_DELETE, { assetUrl: url }, function(d) {
-          if (!Linear.fileDeleted(d)) { notices.notify("Taken out of the text, but Linear did not delete the file.", true); return }
+          if (!Linear.fileDeleted(d)) { notices.notify("Removed from the text, but Linear did not delete the file.", true); return }
           var img = uploads.imageCache[url]
           if (img && img.path) Quickshell.execDetached(["rm", "-f", "--", img.path])
           uploads.setImage(url, "failed")
           notices.notify("Image deleted from Linear", false, root.icon.check)
         }, function(msg) {
           // Linear dropped the mutation between the check and now.
-          if (Linear.isSchemaGone(msg)) { uploads.deleteSupport = "gone"; notices.notify("Taken out of the text, but the file stays in Linear. " + uploads.goneText, true) }
-          else notices.notify("Taken out of the text, but Linear did not delete the file: " + msg, true)
+          if (Linear.isSchemaGone(msg)) { uploads.deleteSupport = "gone"; notices.notify("Removed from the text, but the file stays in Linear. " + uploads.goneText, true) }
+          else notices.notify("Removed from the text, but Linear did not delete the file: " + msg, true)
         })
       }
       var failed = function(msg) { notices.notify("Could not save the text, so the image was not deleted: " + msg, true) }

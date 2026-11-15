@@ -73,7 +73,7 @@ Item {
       onClicked: inboxCtl.searchLinear(root.query)
     }
     Chip {
-      tip: "Clear all filters (Alt+Shift+F; Shift+F keeps the assignee)"
+      tip: "Clear all filters (Alt+Shift+F). Shift+F keeps the assignee."
       visible: root.anyFilter
       text: "Clear filters"
       glyph: root.icon.close

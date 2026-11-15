@@ -87,7 +87,7 @@ Rectangle {
           elide: Text.ElideNone
           opacity: 0.6
           font.pixelSize: Style.font.bodySmall
-          text: "Columns are your team's workflow states in Linear. Renaming, recoloring, adding and archiving changes them in Linear for the whole team; hiding only affects this board. Click a dot to change its color."
+          text: "Columns are your team's statuses in Linear. Renaming, recoloring, adding or archiving one changes it in Linear for the whole team. Hiding one only affects this board. Click a dot to change its color."
         }
         Repeater {
           model: root.settingsTab === "columns" ? root.states.length : 0
@@ -147,7 +147,7 @@ Rectangle {
             placeholderText: "Column name, e.g. In Review"
             Keys.onReturnPressed: function(event) { workspace.addState(text, type); text = ""; event.accepted = true }
           }
-          Button { tooltipText: "Add the column (Enter in the field)"; text: "Add"; iconText: root.icon.plus; bordered: true; onClicked: { workspace.addState(newStateField.text, newStateField.type); newStateField.text = "" } }
+          Button { tooltipText: "Add the column (Enter)"; text: "Add"; iconText: root.icon.plus; bordered: true; onClicked: { workspace.addState(newStateField.text, newStateField.type); newStateField.text = "" } }
         }
 
         // --- labels tab ---
@@ -192,7 +192,7 @@ Rectangle {
             placeholderText: "New label name"
             Keys.onReturnPressed: function(event) { workspace.addLabel(text); text = ""; event.accepted = true }
           }
-          Button { tooltipText: "Add the label (Enter in the field)"; text: "Add label"; iconText: root.icon.plus; bordered: true; onClicked: { workspace.addLabel(newLabelSettingsField.text); newLabelSettingsField.text = "" } }
+          Button { tooltipText: "Add the label (Enter)"; text: "Add label"; iconText: root.icon.plus; bordered: true; onClicked: { workspace.addLabel(newLabelSettingsField.text); newLabelSettingsField.text = "" } }
         }
 
         // --- keys tab: the global Hyprland keys (Service.qml binds them) ---
@@ -203,7 +203,7 @@ Rectangle {
           elide: Text.ElideNone
           opacity: 0.6
           font.pixelSize: Style.font.bodySmall
-          text: "Keys that work everywhere, also while the board is closed. The plugin binds them in Hyprland itself and never takes a key something else uses. Pick a free one, or type your own (e.g. super + alt + l) and press Enter. Kept in " + hotkeys.configPath.replace(root.home, "~") + "."
+          text: "Shortcuts that work everywhere, even while the board is closed. The board never takes a shortcut that something else already uses. Pick a free one, or type your own (for example super + alt + l) and press Enter. Saved in " + hotkeys.configPath.replace(root.home, "~") + "."
         }
         Repeater {
           model: root.settingsTab === "keys" ? hotkeys.settings : []
@@ -265,7 +265,7 @@ Rectangle {
           elide: Text.ElideNone
           opacity: 0.6
           font.pixelSize: Style.font.bodySmall
-          text: "Issues the board creates again on a schedule (all teams). Add one from an issue: open it → Repeat… The copy is made on its day while the shell runs (any time that day); if an issue with the same title was already created that day, for example by another computer, it is skipped. If the computer was off for several days, only the latest copy is made."
+          text: "Issues the board creates again on a schedule, in all teams. To add one, open an issue and choose ⋯ → Repeat. The copy is created on its day while the shell runs. If another computer already created it that day, it isn't created again. If the computer was off for several days, only the latest copy is created."
         }
         Label {
           visible: root.settingsTab === "recurring" && !(root.config.recurring || []).length
@@ -318,7 +318,7 @@ Rectangle {
           elide: Text.ElideNone
           opacity: 0.6
           font.pixelSize: Style.font.bodySmall
-          text: "Active Linear projects of this team. Pick one to show only its issues on the board. The short code on the left (e.g. WEB) is shown next to issue ids on this board only; Linear's ids keep the team prefix."
+          text: "Active projects of this team. Pick one to show only its issues on the board. The short code on the left (for example WEB) appears next to issue IDs on this board only. In Linear, IDs keep the team prefix."
         }
         Repeater {
           model: root.settingsTab === "projects" ? root.projects.length : 0
@@ -361,7 +361,7 @@ Rectangle {
             placeholderText: "New project name"
             Keys.onReturnPressed: function(event) { workspace.addProject(text); text = ""; event.accepted = true }
           }
-          Button { tooltipText: "Create the project in Linear (Enter in the field)"; text: "Create project"; iconText: root.icon.plus; bordered: true; onClicked: { workspace.addProject(newProjectField.text); newProjectField.text = "" } }
+          Button { tooltipText: "Create the project in Linear (Enter)"; text: "Create project"; iconText: root.icon.plus; bordered: true; onClicked: { workspace.addProject(newProjectField.text); newProjectField.text = "" } }
         }
 
         // --- team tab ---
@@ -372,7 +372,7 @@ Rectangle {
           elide: Text.ElideNone
           opacity: 0.6
           font.pixelSize: Style.font.bodySmall
-          text: "The team is the level above projects: it owns the columns, labels and projects on this board. Renaming changes it in Linear for everyone (may need team admin rights). The workspace above teams can only be renamed in Linear's own settings."
+          text: "The team owns the columns, labels and projects on this board. Renaming it changes it in Linear for everyone, and may need team admin rights. The workspace can only be renamed in Linear's settings."
         }
         SectionTitle { visible: root.settingsTab === "team"; text: "Team name" }
         RowLayout {
@@ -384,7 +384,7 @@ Rectangle {
             text: root.team ? root.team.name : ""
             Keys.onReturnPressed: function(event) { workspace.renameTeam(text); keyScope.forceActiveFocus(); event.accepted = true }
           }
-          Button { tooltipText: "Rename the team in Linear (Enter in the field)"; text: "Rename"; bordered: true; onClicked: workspace.renameTeam(teamNameField.text) }
+          Button { tooltipText: "Rename the team in Linear (Enter)"; text: "Rename"; bordered: true; onClicked: workspace.renameTeam(teamNameField.text) }
         }
         SectionTitle { visible: root.settingsTab === "team"; text: "Issue prefix" }
         RowLayout {
@@ -396,10 +396,10 @@ Rectangle {
             text: root.team ? root.team.key : ""
             Keys.onReturnPressed: function(event) { root.changeTeamKey(text); keyScope.forceActiveFocus(); event.accepted = true }
           }
-          Button { tooltipText: "Change the issue prefix (Enter in the field)"; text: "Change"; bordered: true; onClicked: root.changeTeamKey(teamKeyField.text) }
+          Button { tooltipText: "Change the issue prefix (Enter)"; text: "Change"; bordered: true; onClicked: root.changeTeamKey(teamKeyField.text) }
           Label {
             Layout.fillWidth: true
-            text: root.team ? "Issues are " + root.team.key + "-1, " + root.team.key + "-2… Changing it renumbers them; old links keep working." : ""
+            text: root.team ? "Issues are " + root.team.key + "-1, " + root.team.key + "-2… Changing it renumbers them, and old links keep working." : ""
             opacity: 0.5
             font.pixelSize: Style.font.caption
             wrapMode: Text.WordWrap
@@ -498,7 +498,7 @@ Rectangle {
           elide: Text.ElideNone
           opacity: 0.6
           font.pixelSize: Style.font.bodySmall
-          text: "Archived issues leave boards and do not count toward the free plan's issue limit; Linear can restore them. " +
+          text: "Archived issues leave the board and don't count toward the free plan's limit. Linear can restore them. " +
             "Linear also archives closed issues by itself after " + (root.team && root.team.autoArchivePeriod ? root.team.autoArchivePeriod : 6) + " months."
         }
         RowLayout {
@@ -542,7 +542,7 @@ Rectangle {
           elide: Text.ElideNone
           opacity: 0.6
           font.pixelSize: Style.font.bodySmall
-          text: "Linear does not have these, so the board keeps them itself: tracked time (and the running timer), recurring issues, project codes, hidden columns, sort, grouping, layout, and whether time goes to Linear as comments and new notifications to the desktop."
+          text: "Linear doesn't have these, so the board keeps them itself: tracked time and the running timer, recurring issues, project codes, hidden columns, sorting, grouping, layout, and whether time is posted as comments and notifications are shown on the desktop."
         }
         SectionTitle { visible: root.settingsTab === "data"; text: "Shared folder" }
         RowLayout {
@@ -556,7 +556,7 @@ Rectangle {
             text: timeTracker.timeLocation
             Keys.onReturnPressed: function(event) { timeTracker.setTimeLocation(text); keyScope.forceActiveFocus(); event.accepted = true }
           }
-          Button { tooltipText: "Use this folder (Enter in the field)"; text: "Apply"; onClicked: { timeTracker.setTimeLocation(sharedFolderField.text); keyScope.forceActiveFocus() } }
+          Button { tooltipText: "Use this folder (Enter)"; text: "Apply"; onClicked: { timeTracker.setTimeLocation(sharedFolderField.text); keyScope.forceActiveFocus() } }
         }
         Label {
           visible: root.settingsTab === "data"
@@ -566,8 +566,8 @@ Rectangle {
           opacity: 0.5
           font.pixelSize: Style.font.caption
           text: shared.folder
-            ? "Everything above is in " + shared.folder.replace(root.home, "~") + " (" + timeTracker.timePath.replace(/^.*\//, "") + " and linear-board.json). Point another computer at the same synced folder (e.g. Syncthing): what is already there is used, never overwritten. A copy of the settings stays on this computer."
-            : "Kept on this computer only: " + timeTracker.timePath.replace(root.home, "~") + " and " + root.configDir.replace(root.home, "~") + "/config.json. Choose a synced folder (e.g. Syncthing) to share it all between computers."
+            ? "Everything above is in " + shared.folder.replace(root.home, "~") + " (" + timeTracker.timePath.replace(/^.*\//, "") + " and linear-board.json). Point another computer to the same synced folder, for example with Syncthing. It uses what is already there and never overwrites it. A copy of the settings stays on this computer."
+            : "Kept on this computer only, in " + timeTracker.timePath.replace(root.home, "~") + " and " + root.configDir.replace(root.home, "~") + "/config.json. To share it between computers, choose a synced folder, for example with Syncthing."
         }
         Label {
           visible: root.settingsTab === "data" && (timeTracker.timeError !== "" || shared.error !== "")
@@ -585,7 +585,7 @@ Rectangle {
           elide: Text.ElideNone
           opacity: 0.5
           font.pixelSize: Style.font.caption
-          text: "Not shared, on purpose: the API key, the global keys (Keys tab; another computer may have them taken) and the team, project and filter the board is on."
+          text: "Not shared: the API key, the global shortcuts (another computer may have them in use) and the team, project and filters the board shows."
         }
         SectionTitle { visible: root.settingsTab === "data"; text: "Export and import" }
         Button {
@@ -605,7 +605,7 @@ Rectangle {
             placeholderText: "Path to an export, e.g. ~/Downloads/linear-board-export-2026-10-27.json"
             Keys.onReturnPressed: function(event) { shared.importFrom(text); keyScope.forceActiveFocus(); event.accepted = true }
           }
-          Button { tooltipText: "Add what is missing from an export (Enter in the field)"; text: "Import"; iconText: root.icon.upload; onClicked: { shared.importFrom(importAllField.text); keyScope.forceActiveFocus() } }
+          Button { tooltipText: "Add what's missing from an export (Enter)"; text: "Import"; iconText: root.icon.upload; onClicked: { shared.importFrom(importAllField.text); keyScope.forceActiveFocus() } }
         }
         Label {
           visible: root.settingsTab === "data"
@@ -614,7 +614,7 @@ Rectangle {
           elide: Text.ElideNone
           opacity: 0.5
           font.pixelSize: Style.font.caption
-          text: "The export goes to " + timeTracker.downloadsDir().replace(root.home, "~") + " and holds no API key. Import only adds what is missing here (time entries, recurring issues, project codes, hidden columns); nothing here is replaced. Older time-only exports import too."
+          text: "The export goes to " + timeTracker.downloadsDir().replace(root.home, "~") + " and doesn't contain the API key. Import only adds what's missing on this computer (time entries, recurring issues, project codes, hidden columns) and never replaces anything. Older exports with time only work too."
         }
 
         // --- account tab ---

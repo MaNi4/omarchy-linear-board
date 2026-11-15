@@ -199,7 +199,7 @@ Item {
       lists.cycleSettings = d.teamUpdate.team
       notices.notify(patch.cyclesEnabled === false ? "Cycles turned off" : (patch.cyclesEnabled ? "Cycles turned on: Linear makes them in a moment" : "Cycle settings saved"), false, root.icon.check)
       sync.loadTeam()
-    }, function(msg) { notices.notify("Could not change cycle settings (team admins only?): " + msg, true) })
+    }, function(msg) { notices.notify("Could not change the cycle settings (only team admins can): " + msg, true) })
   }
 
   Connections {
@@ -259,7 +259,7 @@ Item {
     }, function() { lists.usageLoading = false })
   }
   readonly property string usageText: lists.usageCount < 0 ? ""
-    : lists.usageCount + " of " + Linear.FREE_PLAN_ISSUES + " issues count toward the Free plan (all teams; archived and deleted ones do not)"
+    : lists.usageCount + " of " + Linear.FREE_PLAN_ISSUES + " issues count toward the free plan (all teams, not counting archived and deleted ones)"
 
   // Archived → trash (Linear's delete; it can still be restored for 30 days).
   function trashArchived(issue, picked) {

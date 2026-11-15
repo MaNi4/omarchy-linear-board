@@ -123,7 +123,7 @@ Item {
 
   function moveState(id, delta) {
     var swap = Linear.positionSwap(root.team.states, id, delta)
-    if (!swap) { notices.notify("Linear keeps columns grouped by kind (To do, In progress, Done…), so it can only move within its group."); return }
+    if (!swap) { notices.notify("Linear keeps statuses grouped by type (Todo, In Progress, Done…), so a column can only move within its group."); return }
     var left = swap.length
     swap.forEach(function(s) {
       root.gql(Linear.M_STATE_UPDATE, { id: s.id, input: { position: s.position } }, function() { if (--left === 0) workspace.afterSchemaChange("") })

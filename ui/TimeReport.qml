@@ -183,7 +183,7 @@ Rectangle {
           Keys.onReturnPressed: function(event) { timeAddBtn.clicked(); event.accepted = true }
         }
         Button {
-          tooltipText: "Add the time (Enter in the fields)"
+          tooltipText: "Add the time (Enter)"
           id: timeAddBtn
           text: "Add"
           iconText: root.icon.plus

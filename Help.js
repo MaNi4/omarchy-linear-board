@@ -10,15 +10,15 @@ var SECTIONS = {
     { title: "Start here", rows: [
       [["Click"], "Open the issue in the editor"], [["Drag"], "Move a card to another column or place"],
       [["Ctrl+click"], "Select several cards, then change them all"], [["Hover", "then", "▶"], "Timer on the card"],
-      [["Double-click"], "Empty part of a column: new issue there; column title: columns settings"],
+      [["Double-click"], "On an empty part of a column: a new issue there. On a column title: column settings."],
       [[], "Hover any button to see what it does and its key."],
       [["Ctrl+K"], "Find any action by name, with its key"], [["?"], "Help for the window you are in (F1 also while typing)"] ] },
     { title: "Move", rows: [
       [["H", "J", "K", "L"], "Left, down, up, right (or arrows)"],
-      [["Shift", "+", "H J K L"], "Move the issue, or all picked ones (or Shift + arrows)"], [["Enter"], "Open the issue (or E)"], [["C"], "New issue (or N)"] ] },
+      [["Shift", "+", "H J K L"], "Move the issue, or all selected ones (or Shift + arrows)"], [["Enter"], "Open the issue (or E)"], [["C"], "New issue (or N)"] ] },
     { title: "Change the issue", rows: [
       [["S"], "Status"], [["P"], "Priority"], [["A"], "Assignee"], [["I"], "Assign to me"],
-      [["T"], "Labels (tags): add, or remove when ✓ (or Ctrl+L)"], [["Shift+P"], "Project"], [["Shift+C"], "Cycle"], [["Ctrl+Shift+C"], "Current cycle"],
+      [["T"], "Labels: add one, or remove one marked ✓ (or Ctrl+L)"], [["Shift+P"], "Project"], [["Shift+C"], "Cycle"], [["Ctrl+Shift+C"], "Current cycle"],
       [["Shift+E"], "Estimate"], [["Shift+D"], "Due date (or Ctrl+D)"], [["Ctrl+Shift+D"], "Remove the due date"], [["R"], "Rename"], [["Ctrl+M"], "Comment"],
       [["Shift+S"], "Subscribe"], [["Shift+M"], "Milestone"], [["Shift+R"], "Remind me"] ] },
     { title: "Select several", rows: [
@@ -31,7 +31,7 @@ var SECTIONS = {
       [["Ctrl+Shift+O"], "New sub-issue"], [["Ctrl+Shift+↑"], "Open the parent"], [["Ctrl+Shift+↓"], "Open a sub-issue"],
       [["M", "then", "R"], "Related to…"], [["M", "then", "X"], "Blocks…"], [["M", "then", "B"], "Blocked by…"] ] },
     { title: "Find and view", rows: [
-      [["/"], "Filter by text; Enter searches all of Linear"], [["F"], "Filters: assignee, priority, labels, project, cycle, text"],
+      [["/"], "Filter by text. Enter searches all of Linear."], [["F"], "Filters: assignee, priority, labels, project, cycle, text"],
       [["Shift+F"], "Clear filters (keeps the assignee)"], [["Alt+Shift+F"], "Clear all filters"],
       [["1", "–", "9"], "Filter by label"], [["V"], "Layout, sort, group, and how long done issues stay"], [["Ctrl+B"], "Board or list"],
       [["Ctrl+K"], "Command palette: any action, issue ID or Linear link"] ] },
@@ -51,14 +51,14 @@ var SECTIONS = {
   issue: [
     { title: "Start here", rows: [
       [["Click a pill"], "Change status, priority, labels… (or the letter key below)"],
-      [["Click the text"], "Edit the description; Preview shows it as Linear will"],
+      [["Click the text"], "Edit the description. Preview shows it as Linear will."],
       [["Drag a file"], "Upload it to Linear into the description or a comment"],
-      [[], "Hover any button or pill to see what it does and its key. In a saved issue every change goes to Linear at once, like in Linear: a property change shows a toast that undoes it, text saves as you type (the footer says Saved). A new issue is made with Create (Ctrl+Enter)."] ] },
+      [[], "Hover any button to see what it does and its shortcut. Like in Linear, changes to a saved issue go to Linear right away, and the title and description save as you type. A toast lets you undo each change. A new issue is created with Create (Ctrl+Enter)."] ] },
     { title: "Save and close", rows: [
-      [["Ctrl+Enter"], "New issue: create it. Saved issue: close (in a comment: send it)"], [["Esc"], "Close (a new issue is not created)"], [["Ctrl+Z"], "Undo the last change"], [["Enter"], "In the title: go to the description"] ] },
+      [["Ctrl+Enter"], "Create a new issue, close a saved one, or send a comment"], [["Esc"], "Close (a new issue is not created)"], [["Ctrl+Z"], "Undo the last change"], [["Enter"], "In the title: go to the description"] ] },
     { title: "Checklists", rows: [
-      [["[ ]", "Space"], "At the start of a line: a checklist item"], [["Enter"], "Next item (in an empty item: end the list)"],
-      [["Click ☐ or its text"], "Tick it; saved to Linear at once"] ] },
+      [["[ ]", "Space"], "At the start of a line: a checklist item"], [["Enter"], "Next item (in an empty item, ends the list)"],
+      [["Click ☐ or its text"], "Tick it. It's saved to Linear right away."] ] },
     { title: "Copy", rows: [
       [["Ctrl+."], "Issue ID"], [["Ctrl+Shift+."], "Git branch name"], [["Ctrl+Shift+,"], "Link"], [["Ctrl+Alt+,"], "Markdown link"] ] },
     { title: "Jump", rows: [
@@ -71,10 +71,10 @@ var SECTIONS = {
       [["Shift+D"], "Due date"], [["R"], "Rename (to the title)"], [["E"], "Edit the description"], [["Shift+T"], "Start / stop the timer"],
       [["Shift+R"], "Remind me, repeat, template, duplicate (⋯ menu)"], [["Ctrl+Shift+C"], "Current cycle"],
       [["Ctrl+Backspace"], "Delete (or Delete)"], [["Ctrl+Shift+X"], "Archive"], [["Ctrl+O"], "Open in Linear"],
-      [[], "They work when you are not typing in a field; Esc leaves a field. While typing, use Alt + the letter: Alt+S, Alt+D, Alt+M… (only project is Alt+Shift+P, since Alt+P is priority)"] ] },
+      [[], "They work when you're not typing in a field (Esc leaves the field). While typing, use Alt + the letter: Alt+S, Alt+D, Alt+M… Project is Alt+Shift+P, because Alt+P is priority."] ] },
     { title: "More properties", rows: [
-      [["Alt+U"], "Parent issue"], [["Alt+Shift+T"], "Team (new issue)"], [["Tab"], "Next field or pill; Enter / Space opens a pill"],
-      [["↑", "↓", "Enter"], "In a menu: choose; typing filters, Esc closes"] ] },
+      [["Alt+U"], "Parent issue"], [["Alt+Shift+T"], "Team (new issue)"], [["Tab"], "Next field or pill. Enter or Space opens a pill."],
+      [["↑", "↓", "Enter"], "In a menu: choose. Type to filter, Esc closes."] ] },
     { title: "While typing", rows: [
       [["@"], "Mention someone in a comment"], [["Ctrl+V"], "Paste an image (uploaded to Linear)"], [["Tab"], "Pick the first suggestion"],
       [["↑", "↓"], "Choose in issue suggestions"], [["Enter"], "Use the suggestion"] ] }
@@ -91,15 +91,15 @@ var SECTIONS = {
     { title: "Cycles", rows: [ [["H"], "Earlier cycle"], [["L"], "Later cycle"], [["E"], "Edit the cycle: name, dates, start today, archive"],
       [["Enter"], "In the cycle fields: save"], [["Esc"], "In the cycle fields: stop editing"] ] },
     { title: "Archived and trash", rows: [ [["Tab"], "Archived ↔ trash"], [["/"], "Filter by ID or title words (Esc clears)"],
-      [["X"], "Pick / unpick (or Space, Ctrl+click)"], [["Ctrl+A"], "Pick all shown (again: none)"], [["Esc"], "Clear what is picked"],
-      [["R"], "Restore the picked ones (or the one under the cursor)"], [["Delete"], "Archived: to the trash. Trash: delete for good (admins only)"],
-      [["Enter"], "Open in Linear"], [[], "Archived issues do not count toward the Free plan's 250; the footer shows how many do."] ] },
+      [["X"], "Select or unselect (or Space, Ctrl+click)"], [["Ctrl+A"], "Select all shown (again to clear)"], [["Esc"], "Clear the selection"],
+      [["R"], "Restore the selected ones (or the one under the cursor)"], [["Delete"], "Archived: to the trash. Trash: delete for good (admins only)"],
+      [["Enter"], "Open in Linear"], [[], "Archived issues don't count toward the free plan's 250. The footer shows how many do."] ] },
     { title: "Triage", rows: [ [["A"], "Accept into the backlog"], [["D"], "Decline (cancel)"] ] }
   ],
   project: [
     { title: "Project overview", rows: [
       [["Enter"], "In a field: save it"], [["Ctrl+Enter"], "Post the update (or save the one you edit)"], [["Ctrl+V"], "Paste an image into the update"],
-      [["Esc"], "Stop editing an update, else close"], [[], "Edit / Delete next to your own updates change them in Linear."] ] }
+      [["Esc"], "Stop editing an update, or close"], [[], "Edit and Delete next to your own updates change them in Linear."] ] }
   ],
   time: [
     { title: "Time report", rows: [

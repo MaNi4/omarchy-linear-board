@@ -236,7 +236,7 @@ Item {
         // showing part of the list as if it were all.
         if (more && pages >= limit && !enough) {
           console.warn("linear-board: stopped after " + limit + " pages (" + nodes.length + " items)")
-          notices.notify("Linear has more than " + nodes.length + " here; only those are shown.", true)
+          notices.notify("Linear has more than " + nodes.length + " here. Only those are shown.", true)
         }
         ok(nodes)
       }, fail)
@@ -299,7 +299,7 @@ Item {
   function applyTeam(got, edits) {
     root.loadingTeam = false
     var t = got.team
-    if (!t) { notices.notify("Linear did not return this team. Pick another one (t).", true); return }
+    if (!t) { notices.notify("Linear didn't return this team. Pick another one (O then T).", true); return }
     var sel = root.selectedIssue ? root.selectedIssue.id : ""
     root.team = { id: t.id, name: t.name, key: t.key, states: got.states,
       estimationType: t.issueEstimationType, estimationAllowZero: t.issueEstimationAllowZero,

@@ -65,7 +65,7 @@ Item {
       selected: !!root.config.assignee
       tint: root.accent
       implicitHeight: Style.spacing.controlHeight + Style.space(4)
-      tip: "Assignee filter (O then U; G then M: mine)"
+      tip: "Filter by assignee (O then U). G then M shows your issues."
       onClicked: pickers.openPicker("assignee", assigneeButton.mapToItem(keyScope, 0, 0).x)
     }
     Chip {
@@ -86,7 +86,7 @@ Item {
       selected: root.cycleFilter !== ""
       tint: root.accent
       implicitHeight: Style.spacing.controlHeight + Style.space(4)
-      tip: "Cycle filter (O then C; G then V shows the cycle)"
+      tip: "Filter by cycle (O then C). G then V shows the current cycle."
       onClicked: pickers.openPicker("cycle", cycleButton.mapToItem(keyScope, 0, 0).x)
     }
     Chip {

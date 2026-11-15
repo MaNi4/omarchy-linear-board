@@ -118,7 +118,7 @@ Rectangle {
     Button {
       visible: lists.isBin && lists.searchResults.length > 0
       text: lists.binPicked.length === lists.searchResults.length ? "Pick none" : "Pick all"
-      tooltipText: "Pick every issue in the list (Ctrl+A); X or Ctrl+click picks one"
+      tooltipText: "Select every issue in the list (Ctrl+A). X or Ctrl+click selects one."
       onClicked: lists.pickAllBin()
     }
     Button {
@@ -126,21 +126,21 @@ Rectangle {
       text: "Restore " + lists.binPicked.length
       iconText: root.icon.check
       bordered: true
-      tooltipText: "Restore the picked issues (R)"
+      tooltipText: "Restore the selected issues (R)"
       onClicked: lists.restoreTrashed(null, true)
     }
     Button {
       visible: lists.listMode === "archived" && lists.binPicked.length > 0
       text: "Delete " + lists.binPicked.length
       foreground: root.urgent
-      tooltipText: "Move the picked issues to the trash (30 days, can be restored) (Delete)"
+      tooltipText: "Move the selected issues to the trash, where they can be restored for 30 days (Delete)"
       onClicked: lists.trashArchived(null, true)
     }
     Button {
       visible: lists.listMode === "trash" && lists.binPicked.length > 0
       text: "Delete " + lists.binPicked.length + " for good"
       foreground: root.urgent
-      tooltipText: "Delete the picked issues for good; cannot be undone, workspace admins only (Delete)"
+      tooltipText: "Delete the selected issues for good. Workspace admins only, and it can't be undone (Delete)"
       onClicked: lists.deleteForever(null, true)
     }
   }
@@ -209,12 +209,12 @@ Rectangle {
         visible: !!cycleEdit.cycle && cycleEdit.cycle.isNext
         text: "Start today"
         iconText: root.icon.play
-        tooltipText: "Start this upcoming cycle now; the current one ends"
+        tooltipText: "Start this upcoming cycle now. The current one ends."
         onClicked: lists.startCycleToday()
       }
       Item { Layout.fillWidth: true }
       Button { text: "Settings…"; iconText: root.icon.cog; tooltipText: "Cycle length, start day, how many ahead (Settings → Team)"; onClicked: pickers.openSettings("team") }
-      Button { tooltipText: "Archive this cycle; its issues leave it"; text: "Archive"; iconText: root.icon.archive; foreground: root.urgent; onClicked: lists.archiveCycle() }
+      Button { tooltipText: "Archive this cycle. Its issues are taken out of it."; text: "Archive"; iconText: root.icon.archive; foreground: root.urgent; onClicked: lists.archiveCycle() }
     }
     Label {
       width: parent.width
@@ -222,7 +222,7 @@ Rectangle {
       elide: Text.ElideNone
       opacity: 0.5
       font.pixelSize: Style.font.caption
-      text: "Dates like 2026-11-02 or 2.11.2026. Linear makes new cycles itself from the team's cycle settings; creating one by hand is not in its API."
+      text: "Dates like 2026-11-02 or 2.11.2026. Linear creates new cycles by itself from the team's cycle settings. Its API can't create one by hand."
     }
   }
   // Cycle progress: done / started / not started.
@@ -349,7 +349,7 @@ Rectangle {
         Button {
           visible: lists.isBin
           text: "Restore"
-          tooltipText: lists.listMode === "archived" ? "Back on the board; counts toward the Free plan again (R)" : "Back where it was (R)"
+          tooltipText: lists.listMode === "archived" ? "Restore it to the board. It counts toward the free plan again (R)" : "Back where it was (R)"
           anchors.verticalCenter: parent.verticalCenter
           onClicked: lists.restoreTrashed(resRow.modelData)
         }
@@ -365,7 +365,7 @@ Rectangle {
           visible: lists.listMode === "trash"
           text: "Delete for good"
           foreground: root.urgent
-          tooltipText: "Cannot be undone; workspace admins only (Delete)"
+          tooltipText: "Workspace admins only. Can't be undone (Delete)"
           anchors.verticalCenter: parent.verticalCenter
           onClicked: lists.deleteForever(resRow.modelData)
         }
@@ -373,7 +373,7 @@ Rectangle {
           visible: lists.listMode === "triage"
           text: "Decline"
           foreground: root.urgent
-          tooltipText: "Decline: cancel it (D)"
+          tooltipText: "Decline and cancel it (D)"
           anchors.verticalCenter: parent.verticalCenter
           onClicked: lists.triageDecline(resRow.modelData)
         }
@@ -389,11 +389,11 @@ Rectangle {
     opacity: 0.45
     font.pixelSize: Style.font.caption
     text: ({
-      mine: "Open issues assigned to you in every team; another team's issue switches the board to it  ·  ? shortcuts",
+      mine: "Open issues assigned to you in every team. Opening one from another team switches the board to it  ·  ? shortcuts",
       cycle: "H / L earlier or later cycle  ·  E edit the cycle  ·  Enter open  ·  ? shortcuts",
-      archived: (lists.usageText ? lists.usageText + "\n" : "") + "Linear keeps archived issues for good  ·  Tab trash  ·  X pick  ·  Ctrl+A all  ·  R restore  ·  Delete to the trash  ·  Enter open in Linear",
-      trash: (lists.usageText ? lists.usageText + "\n" : "") + "Deleted issues stay " + Linear.TRASH_DAYS + " days  ·  Tab archived  ·  X pick  ·  Ctrl+A all  ·  R restore  ·  Delete delete for good  ·  Enter open in Linear",
+      archived: (lists.usageText ? lists.usageText + "\n" : "") + "Linear keeps archived issues for good  ·  Tab trash  ·  X select  ·  Ctrl+A all  ·  R restore  ·  Delete to the trash  ·  Enter open in Linear",
+      trash: (lists.usageText ? lists.usageText + "\n" : "") + "Deleted issues stay " + Linear.TRASH_DAYS + " days  ·  Tab archived  ·  X select  ·  Ctrl+A all  ·  R restore  ·  Delete delete for good  ·  Enter open in Linear",
       triage: "A accept into the backlog  ·  D decline  ·  Enter open  ·  ? shortcuts"
-    }[lists.listMode]) || "All your teams, old done issues too; another team's issue switches the board to it  ·  ? shortcuts"
+    }[lists.listMode]) || "All your teams, including old done issues. Opening one from another team switches the board to it  ·  ? shortcuts"
   }
 }

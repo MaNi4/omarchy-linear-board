@@ -227,9 +227,9 @@ Item {
     timeTracker.lastAwayAsked = to
     // A click removes the time; closing the notification keeps it.
     notices.desktopNote("Timer on " + r.identifier + " kept running",
-      "You were away for " + mins + " min. Click to remove that time from the timer; close this to keep it.",
+      "You were away for " + mins + " min. Click to remove that time from the timer, or close this to keep it.",
       { timer: "away", from: new Date(from).toISOString(), to: new Date(to).toISOString() }, 2)
-    notices.notify("Away " + mins + " min while the timer ran: click the notification to remove it")
+    notices.notify("You were away for " + mins + " min while the timer ran. Click the notification to remove that time.")
   }
 
   // Take [from, to] out of the running timer: log the part before, go on from `to`.
@@ -250,7 +250,7 @@ Item {
     d.running = next
     if (!timeTracker.saveTime(d)) return
     timeTracker.nowMs = Date.now()
-    notices.notify("Removed " + Math.round((to - from) / 60000) + " min away" + (logged ? "; logged " + Time.formatDuration(logged.seconds) + " before it" : ""))
+    notices.notify("Removed " + Math.round((to - from) / 60000) + " min of away time" + (logged ? ". Logged " + Time.formatDuration(logged.seconds) + " before it." : ""))
     if (logged) timeTracker.postTimeComment(logged)
   }
 
@@ -367,9 +367,9 @@ Item {
         timeTracker.saveTime(keep)
       }
       var where = target.replace(root.home, "~").replace(/\/[^\/]*$/, "")
-      if (!location) notices.notify("Shared folder off: everything is kept on this computer (" + where + ")")
+      if (!location) notices.notify("Shared folder turned off. Everything is kept on this computer (" + where + ").")
       else if (timeExists || settingsExist) notices.notify("Using what is already in " + where + " (time" + (timeExists ? "" : ": moved from here") + ", recurring issues and settings" + (settingsExist ? "" : ": copied from here") + ")")
-      else notices.notify("Time, recurring issues and settings now kept in " + where)
+      else notices.notify("Time, recurring issues and settings are now kept in " + where)
     }
   }
 

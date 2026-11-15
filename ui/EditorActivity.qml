@@ -227,7 +227,7 @@ Column {
           visible: commentField.text.trim() !== ""
           text: ed.commentPreview ? "Hide preview" : "Preview"
           iconText: root.icon.eye
-          tooltipText: "Show the comment as Linear will (Ctrl+Shift+P while writing it)"
+          tooltipText: "Preview the comment as Linear shows it (Ctrl+Shift+P)"
           onClicked: ed.commentPreview = !ed.commentPreview
         }
       }
