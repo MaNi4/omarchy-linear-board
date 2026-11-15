@@ -52,7 +52,7 @@ time, paste a personal API key from Linear → Settings → Security & access (o
 |---|---|---|
 | ![An issue open in the editor](screenshots/editor.png) | ![The inbox](screenshots/inbox.png) | ![A project's progress, milestones and updates](screenshots/project.png) |
 
-The pictures show made-up data (`node tests/e2e/screenshots.js` makes them again).
+The pictures show made-up data (`npm run screenshots` makes them again).
 
 [FEATURES.md](FEATURES.md) describes every feature in detail.
 
@@ -73,7 +73,7 @@ Linear has no place for these, so the board keeps them itself:
 
 **Shared folder** (Settings → Data): type a folder, e.g. a Syncthing one such as `~/Sync/linear`, and press Apply. The time and settings files are kept there. A computer pointed at a folder that already has them uses those, and anything missing is copied from that computer. A file that should be there but is not (sync not finished, disk not mounted) is waited for and never replaced; until it shows up, changes stay on that computer. `config.json` keeps a copy of the shared settings, so the board works the same when the folder is gone. An empty field keeps everything on this computer again.
 
-If the same thing is changed on two computers before they sync, the sync tool keeps one version (Syncthing leaves the other beside it as a `sync-conflict` file). Recurring issues are still made only once a day, since the board first asks Linear whether the copy exists.
+If the same file is changed on two computers before they sync (one was offline), Syncthing keeps one version and leaves the other beside it as a `.sync-conflict` copy. The board finds such copies within 30 seconds, adds their time entries, recurring issues and project codes to the file in use (nothing is removed, so an entry deleted on one computer can come back from the other's copy) and deletes the copy; one it cannot read is left alone and reported. A recurring issue is made once a day even when two computers create it at the same moment: the board asks Linear first, and each copy has an id made from the rule and the day, so Linear refuses a second one.
 
 **Export and import** (Settings → Data): "Export everything" saves one JSON file to `~/Downloads` with all of the above except the API key, the global keys and where the board is. Import only adds what is missing on this computer (time entries, recurring issues, project codes, hidden columns) and never replaces anything. Older time-only exports import too.
 
@@ -128,6 +128,9 @@ Without a key, the same as a command (e.g. for your own binding):
 
 When things go wrong:
 
+- A request Linear does not answer is given up after 30 seconds. A change whose answer is lost waits in the outbox; a new issue or comment carries its own id, so sending it again never makes a second one (Linear refuses the copy and the board takes the first).
+- Changes reach Linear in the order they were made: while some wait in the outbox, new ones queue behind them, and changes to one issue go out one at a time. An older change the network still delivers after the newer one was sent is noticed (Linear is checked 15 s, 1 and 3 minutes later) and the newer values are sent again.
+- After a suspend or a network change, connections from before it can hang without an error, and Qt keeps reusing them. The board notices waking up (requests then give up after 8 s), and after a hung request it sends requests through `curl`, a fresh connection each, for 15 minutes. Loading a team that got no answer is tried again.
 - The inbox is checked every minute. A check that never comes back is given up after 5 minutes, and an answer that cannot be read does not stop the next checks. When the bar's count is more than 5 minutes old, its icon dims and the tooltip says since when and why.
 - After a plugin reload an old board can still be running; the bar follows the one that started last.
 - The inbox uses fields Linear marks internal (unread count, grouping, titles). Should Linear turn them off, the inbox switches to its public fields and makes them up the same way (newest 200 notifications).
@@ -158,9 +161,9 @@ Against the real API, in a Linear project kept for testing (everything it makes 
 
     LINEAR_TEST_PROJECT=<project id> node tests/e2e/live.js
 
-The board's requests then go through a local proxy that can lose, delay or refuse them, so the outbox, rate limit and lost-answer cases also run against Linear's real answers.
+The board's requests then go through a local proxy that can lose, delay or refuse them, so the outbox, rate limit and lost-answer cases also run against Linear's real answers. `LIVE_CURL=1` sends every request through curl (as after a hung connection), `LIVE_DIRECT=1` skips the proxy (its failure tests then do not apply).
 
-GitHub Actions runs `npm test` on every push and every morning, so a change in Linear's API fails a run (GitHub sends an email). With a `LINEAR_API_KEY` repository secret it also checks the live API's schema.
+GitHub Actions runs `npm test` on every push and every morning, so a change in Linear's API fails a run (GitHub sends an email). With a `LINEAR_API_KEY` repository secret it also checks the live API's schema and that Linear still answers the internal inbox fields; a read-only key limited to one team is enough.
 
 ## License
 
