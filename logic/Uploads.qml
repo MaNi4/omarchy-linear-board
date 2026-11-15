@@ -211,7 +211,7 @@ Item {
     var src = /^file:\/\//.test(item.src) ? decodeURIComponent(item.src.replace(/^file:\/\//, "")) : item.src
     prepareProc.command = ["sh", "-c",
       'umask 077; case "$1" in http://*|https://*) n=$(basename -- "${1%%[?#]*}"); f="$2/drop-$(date +%s%N)-${n:-file}"; ' +
-      'curl -sSfL --max-filesize "$3" -o "$f" -- "$1" || { rm -f -- "$f"; exit 1; }; tmp=1;; ' +
+      'curl -sSfL --proto =http,https --proto-redir =http,https --max-filesize "$3" -o "$f" -- "$1" || { rm -f -- "$f"; exit 1; }; tmp=1;; ' +
       '*) f="$1"; tmp=0;; esac; [ -f "$f" ] || exit 2; ' +
       'printf "%s %s %s %s\\n" "$(file -b --mime-type -- "$f")" "$(stat -c %s -- "$f")" "$tmp" "$f"', "sh", src, root.cacheDir, String(uploads.maxDownload)]
     prepareProc.running = true
