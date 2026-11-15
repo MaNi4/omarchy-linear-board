@@ -5,7 +5,7 @@
   "scripts": {
     "test": "node tests/helpers.test.js && node tests/time.test.js && node tests/shared.test.js && node tests/hotkey.test.js && node tests/refs.test.js && node tests/members.test.js && node tests/api.test.js",
     "test:api": "node tests/api.test.js",
-    "test:e2e": "node tests/e2e/run.js",
+    "test:e2e": "node tests/e2e/run.js && node tests/e2e/shared.js",
     "test:qml": "QT_QPA_PLATFORM=offscreen ${QMLTESTRUNNER:-/usr/lib/qt6/bin/qmltestrunner} -import tests/qml/imports -input tests/qml"
   },
   "devDependencies": {

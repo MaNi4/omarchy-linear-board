@@ -144,6 +144,8 @@ End to end, on an Omarchy machine:
 
 `tests/e2e/run.js` starts `tests/fake-linear.js`, a stand-in for Linear's API that answers from made-up data (a team, issues, an inbox) against Linear's schema, and runs the board with its bar widget in a separate, offscreen Quickshell with its files in a temporary directory. Nothing shows on the desktop and nothing reaches Linear or your own files; desktop notifications, `hyprctl`, `wl-copy` and `xdg-open` are stubs. It covers loading, edits, the offline outbox, rate limits, timeouts, broken answers, a wrong or revoked key, the inbox and its fallback, desktop notifications, paging and the bar widget. The fake server also works by hand: `node tests/fake-linear.js`, then start a shell with `LINEAR_BOARD_ENDPOINT=http://127.0.0.1:47123/graphql LINEAR_API_KEY=lin_api_fake` (only an address on this machine is accepted there).
 
+`tests/e2e/shared.js` runs two such boards as two computers sharing a folder (Settings → Data): time and settings reach the other one, Syncthing's `.sync-conflict` copies are merged (time entries and recurring rules from both are kept), and a recurring issue due on both at the same moment is made once.
+
 Against the real API, in a Linear project kept for testing (everything it makes is named `[bt] …` and deleted at the end; the inbox is only read):
 
     LINEAR_TEST_PROJECT=<project id> node tests/e2e/live.js

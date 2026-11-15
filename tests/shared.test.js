@@ -68,4 +68,10 @@ const none = S.mergeSettings(here, {})
 assert.strictEqual(none.rules + none.codes, 0)
 assert.ok(!S.differs(here, none.config))
 
+// Syncthing's conflict copies of a file
+assert.strictEqual(S.conflictGlob("linear-time.json"), "linear-time.sync-conflict-*.json")
+assert.strictEqual(S.conflictGlob("linear-board.json"), "linear-board.sync-conflict-*.json")
+assert.strictEqual(S.conflictGlob("time.v2.json"), "time.v2.sync-conflict-*.json")
+assert.strictEqual(S.conflictGlob("noext"), "")
+
 console.log("shared tests passed")

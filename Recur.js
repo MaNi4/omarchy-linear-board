@@ -107,3 +107,18 @@ function inRecurSeries(rule, issue) {
 function recurUpcoming(rule, today) {
   return recurNext(rule, rule.last && rule.last >= today ? rule.last : Dates.isoDate(Dates.addDays(Dates.dateOf(today), -1)))
 }
+
+// The id (a UUID) of the copy of `ruleId` for the day `iso`: the same on
+// every computer, so when two of them create the copy at the same moment
+// Linear refuses the second ("conflict on insert") instead of making two.
+function recurIssueId(ruleId, iso) {
+  var text = String(ruleId) + "|" + String(iso)
+  var hex = ""
+  for (var seed = 0; seed < 4; seed++) {
+    var h = (0x811c9dc5 ^ (seed * 0x9e3779b1)) >>> 0
+    for (var i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0 }
+    hex += ("00000000" + h.toString(16)).slice(-8)
+  }
+  return hex.slice(0, 8) + "-" + hex.slice(8, 12) + "-4" + hex.slice(13, 16) + "-" +
+    "89ab".charAt(parseInt(hex.charAt(16), 16) & 3) + hex.slice(17, 20) + "-" + hex.slice(20, 32)
+}

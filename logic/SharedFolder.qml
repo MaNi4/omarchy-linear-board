@@ -84,6 +84,82 @@ Item {
     onTriggered: sharedFile.reload()
   }
 
+  // ---- conflict copies ----
+  // When two computers changed the time file or linear-board.json before
+  // syncing (one was offline), Syncthing keeps one version and puts the
+  // other next to it as a .sync-conflict copy. Their time entries and
+  // recurring rules / project codes are added to the file in use (nothing
+  // is removed), then the copy is deleted. A copy that cannot be read is
+  // left alone and reported once.
+  property var conflictQueue: []
+  property var conflictReported: ({})
+  Timer {
+    interval: 30000
+    repeat: true
+    triggeredOnStart: true
+    running: !!shared.folder && shared.writable && timeTracker.timeWritable
+    onTriggered: shared.findConflicts()
+  }
+  function findConflicts() {
+    if (conflictFind.running || shared.conflictQueue.length) return
+    var timeName = timeTracker.timePath.substring(timeTracker.timePath.lastIndexOf("/") + 1)
+    conflictFind.command = ["sh", "-c", 'cd "$1" 2>/dev/null || exit 0; for f in $2 $3; do [ -f "$f" ] && printf "%s\\n" "$PWD/$f"; done; exit 0',
+      "sh", shared.folder, Shared.conflictGlob(timeName), Shared.conflictGlob(Shared.FILE_NAME)]
+    conflictFind.running = true
+  }
+  Process {
+    id: conflictFind
+    stdout: StdioCollector { id: conflictList }
+    onExited: {
+      var found = conflictList.text.split("\n").filter(function(f) { return f && !shared.conflictReported[f] })
+      if (!found.length) return
+      shared.conflictQueue = found
+      conflictFile.path = found[0]
+    }
+  }
+  FileView {
+    id: conflictFile
+    printErrors: false
+    onLoaded: shared.mergeConflict(conflictFile.path, text())
+    onLoadFailed: shared.nextConflict(false)
+  }
+  function mergeConflict(file, text) {
+    var isSettings = file.substring(file.lastIndexOf("/") + 1).indexOf(Shared.FILE_NAME.replace(/\.json$/, "") + ".sync-conflict-") === 0
+    var said = ""
+    if (isSettings) {
+      var r = Shared.parse(text)
+      if (r.error) { shared.nextConflict(false, r.error); return }
+      var s = Shared.mergeSettings(root.config, r.data)
+      if (Shared.differs(root.config, s.config)) root.setConfig(s.config)
+      if (s.rules || s.codes) said = [s.rules ? s.rules + " recurring issue" + (s.rules === 1 ? "" : "s") : "", s.codes ? s.codes + " project code" + (s.codes === 1 ? "" : "s") : ""].filter(function(x) { return x }).join(", ")
+    } else {
+      var t = Time.parse(text)
+      if (t.error) { shared.nextConflict(false, t.error); return }
+      var m = Time.merge(timeTracker.copyData(), t.data)
+      if (m.added) {
+        if (!timeTracker.saveTime(m.data)) { shared.nextConflict(false, "the time file cannot be written"); return }
+        said = m.added + " time " + (m.added === 1 ? "entry" : "entries")
+      }
+    }
+    if (said) notices.notify("Merged from a sync conflict copy: " + said)
+    console.warn("linear-board: merged and removed the sync conflict copy " + file + (said ? " (" + said + ")" : " (nothing new)"))
+    shared.nextConflict(true)
+  }
+  function nextConflict(merged, error) {
+    var file = shared.conflictQueue[0]
+    if (merged) Quickshell.execDetached(["rm", "-f", "--", file])
+    else if (file) {
+      var rep = {}
+      for (var k in shared.conflictReported) rep[k] = shared.conflictReported[k]
+      rep[file] = true
+      shared.conflictReported = rep
+      notices.notify("A sync conflict copy could not be merged" + (error ? " (" + error + ")" : "") + ": " + file.replace(root.home, "~"), true)
+    }
+    shared.conflictQueue = shared.conflictQueue.slice(1)
+    if (shared.conflictQueue.length) conflictFile.path = shared.conflictQueue[0]
+    else conflictFile.path = ""
+  }
+
   // ---- export and import of everything kept outside Linear ----
   function exportAll() {
     var name = "linear-board-export-" + Time.isoDate(new Date()) + ".json"

@@ -343,7 +343,9 @@ test("an inbox check that never comes back is given up", async () => {
   await ctl("fault", { match: "^Inbox$", kind: "hang" })
   ev("m('loadInbox').loadInbox()")
   await waitFor(() => ev("m('loadInbox').loading"), 3000, "loading")
-  await waitFor(() => !ev("m('loadInbox').loading"), 40000, "the 30 s request watchdog")
+  await waitFor(() => !ev("m('loadInbox').loading"), 40000, async () => "the 30 s request watchdog; " +
+    JSON.stringify(ev("({ inflight: board.inflight.map(function(r) { return Math.round((Date.now() - r.at) / 1000) }), wokeAgo: board.wokeAt ? Math.round((Date.now() - board.wokeAt) / 1000) : -1, curl: board.viaCurlUntil > Date.now(), seq: m('loadInbox').loadSeq, since: Math.round((Date.now() - m('loadInbox').loadingSince) / 1000) })")) +
+    "; log: " + (await serverLog()).slice(-6).map(e => e.op + ":" + e.status + (e.fault ? "/" + e.fault : "")).join(", "))
   ok(/did not answer/.test(inboxState().error), "error in inbox.json: " + inboxState().error)
   ev("m('loadInbox').loadInbox()")
   await waitFor(() => inboxState().error === "", 5000, "the next check to work")
@@ -637,4 +639,4 @@ if (require.main === module)
 
 // tests/e2e/live.js drives the same harness against the real API.
 module.exports = { setup, startBoard, stopBoard, ev, evs, shot, shellLog, inboxState, waitFor, sleep, eq, ok, TMP, FILES, RUN,
-  outbox, toast }
+  outbox, toast, startServer, stopServer: () => server && server.kill(), ctl, request, records, record, serverLog, BIN, HARNESS, OMARCHY, PORT, ROOT }

@@ -625,6 +625,11 @@ assert.strictEqual(L.requestTimeout(90000, 102000), 30000)      // long before
   assert.deepStrictEqual(plain(L.curlResult(28, "")), { status: 0, body: "" })        // timed out
   assert.deepStrictEqual(plain(L.curlResult(0, "no code")), { status: 0, body: "" })
 }
+// A recurring copy has the same id on every computer.
+assert.strictEqual(L.recurIssueId("r1", "2026-11-14"), L.recurIssueId("r1", "2026-11-14"))
+assert.notStrictEqual(L.recurIssueId("r1", "2026-11-14"), L.recurIssueId("r1", "2026-11-15"))
+assert.notStrictEqual(L.recurIssueId("r1", "2026-11-14"), L.recurIssueId("r2", "2026-11-14"))
+assert.match(L.recurIssueId("1793040870272", "2026-11-14"), /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
 // Only a server on this machine may stand in for Linear's API.
 assert.strictEqual(L.endpointFor(""), L.ENDPOINT)
 assert.strictEqual(L.endpointFor("http://127.0.0.1:47123/graphql"), "http://127.0.0.1:47123/graphql")

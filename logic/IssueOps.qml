@@ -425,10 +425,16 @@ Item {
       }) })
     }
     var finish = function() { issueOps.recurBusy = false; Qt.callLater(issueOps.runRecurring) }
+    // Leave it due: it is tried again next minute. A rule Linear keeps
+    // refusing (deleted team or project) is reported once a day at most.
+    var refused = function(msg) {
+      issueOps.recurBusy = false
+      if (issueOps.recurWarned !== rule.id + due) { issueOps.recurWarned = rule.id + due; notices.notify("Could not create the recurring issue “" + rule.title + "”: " + msg, true) }
+    }
     root.gql(Linear.Q_RECUR_EXISTS, { filter: Linear.recurExistsFilter(rule, due) }, function(d) {
       if (d.issues.nodes.length) { mark(); finish(); return }
-      var input = { teamId: rule.teamId, title: rule.title, description: Markdown.untickTasks(rule.description || ""), priority: rule.priority || 0,
-        labelIds: rule.labelIds || [] }
+      var input = { id: Recur.recurIssueId(rule.id, due), teamId: rule.teamId, title: rule.title,
+        description: Markdown.untickTasks(rule.description || ""), priority: rule.priority || 0, labelIds: rule.labelIds || [] }
       if (rule.stateId) input.stateId = rule.stateId
       if (rule.projectId) input.projectId = rule.projectId
       if (rule.milestoneId) input.projectMilestoneId = rule.milestoneId
@@ -442,10 +448,11 @@ Item {
         notices.notify("Recurring issue created: " + issue.identifier + " " + issue.title)
         finish()
       }, function(msg) {
-        // Leave it due: it is tried again next minute. A rule Linear keeps
-        // refusing (deleted team or project) is reported once a day at most.
-        issueOps.recurBusy = false
-        if (issueOps.recurWarned !== rule.id + due) { issueOps.recurWarned = rule.id + due; notices.notify("Could not create the recurring issue “" + rule.title + "”: " + msg, true) }
+        // Another computer made this copy at the same moment (same id): done.
+        root.gql(Linear.Q_ISSUE_REF, { id: input.id }, function(d) {
+          if (d.issue) { mark(); finish(); return }
+          refused(msg)
+        }, function() { refused(msg) })
       })
     }, function() { issueOps.recurBusy = false })
   }

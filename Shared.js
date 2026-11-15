@@ -116,7 +116,17 @@ function mergeSettings(config, incoming) {
   return { config: next, rules: rules, codes: codes }
 }
 
+// ---- copies Syncthing keeps when two computers changed a file at once ----
+// "linear-time.json" → its conflict copies are named
+// "linear-time.sync-conflict-20261114-221500-ABCDEFG.json". Returns the
+// glob for them, or "" for a name without an extension.
+function conflictGlob(fileName) {
+  var m = /^(.+)(\.[^.\/]+)$/.exec(String(fileName || ""))
+  return m ? m[1] + ".sync-conflict-*" + m[2] : ""
+}
+
 if (typeof module !== "undefined") {
   module.exports = { VERSION: VERSION, FILE_NAME: FILE_NAME, KEYS: KEYS, clean: clean, pick: pick, serialize: serialize,
-    parse: parse, apply: apply, differs: differs, exportText: exportText, parseExport: parseExport, mergeSettings: mergeSettings }
+    parse: parse, apply: apply, differs: differs, exportText: exportText, parseExport: parseExport, mergeSettings: mergeSettings,
+    conflictGlob: conflictGlob }
 }
