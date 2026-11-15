@@ -4,6 +4,8 @@ A kanban window for [Linear](https://linear.app) in the Omarchy shell: your team
 workflow state, edited like in Linear and with Linear's keys, plus what Linear does not have: time tracking,
 recurring issues and an inbox count in the bar. Changes go to Linear at once, and wait when you are offline.
 
+![The board: a team's issues by workflow state, with a timer running](preview.png)
+
 ## Install
 
 Requires Omarchy 4 and a Linear account.
@@ -45,6 +47,12 @@ time, paste a personal API key from Linear → Settings → Security & access (o
   as a comment.
 - **Recurring issues**: every day, weekday, week or month; each copy is a new issue.
 - **Undo** for the last 30 changes, and an **offline** queue that sends changes when Linear is back.
+
+| Issue editor | Inbox | Project overview |
+|---|---|---|
+| ![An issue open in the editor](screenshots/editor.png) | ![The inbox](screenshots/inbox.png) | ![A project's progress, milestones and updates](screenshots/project.png) |
+
+The pictures show made-up data (`node tests/e2e/screenshots.js` makes them again).
 
 [FEATURES.md](FEATURES.md) describes every feature in detail.
 

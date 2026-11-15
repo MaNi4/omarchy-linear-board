@@ -182,6 +182,107 @@ function seed() {
     subtitle: "New project update by Alex Other", inboxUrl: "https://linear.app/fake/inbox/p" })
 }
 
+// Made-up data for the README's screenshots (POST /_control/demo): a small
+// product team in the middle of a cycle. Nothing here is real.
+function seedDemo() {
+  db = { byId: {}, types: {} }
+  seq = 0
+  const user = (id, name, displayName) => put("User", { id, name, displayName, email: displayName + "@example.com", active: true, teamIds: [] })
+  const me = user("user-me", "Alex Rivera", "alex")
+  const sam = user("user-sam", "Sam Chen", "sam")
+  const priya = user("user-priya", "Priya Patel", "priya")
+  const jordan = user("user-jordan", "Jordan Lee", "jordan")
+  viewerId = me.id
+  const team = put("Team", { id: "team-web", name: "Web App", key: "WEB", issueEstimationType: "fibonacci", issueEstimationAllowZero: false,
+    issueEstimationExtended: false, autoArchivePeriod: 6, triageEnabled: false, cyclesEnabled: true, cycleDuration: 2, cycleStartDay: 1,
+    cycleCooldownTime: 0, upcomingCycleCount: 2 })
+  const mob = put("Team", { id: "team-mob", name: "Mobile", key: "MOB", issueEstimationType: "notUsed", autoArchivePeriod: 6, cyclesEnabled: false })
+  for (const u of [me, sam, priya, jordan]) u.teamIds = [team.id, mob.id]
+  const st = {}
+  ;[["backlog", "Backlog", "#bec2c8", 0], ["unstarted", "Todo", "#e2e2e2", 1], ["started", "In Progress", "#f2c94c", 2],
+    ["review", "In Review", "#0f783c", 3], ["completed", "Done", "#5e6ad2", 4], ["canceled", "Canceled", "#95a2b3", 5]].forEach(([key, name, color, position]) => {
+    st[key] = put("WorkflowState", { id: "state-" + key, name, type: key === "review" ? "started" : key, color, position, teamId: team.id })
+  })
+  ;[["unstarted", "Todo"], ["started", "Doing"], ["completed", "Done"]].forEach(([type, name], i) =>
+    put("WorkflowState", { id: "mob-state-" + type, name, type, color: "#888888", position: i, teamId: mob.id }))
+  const L = {}
+  ;[["bug", "Bug", "#eb5757"], ["feature", "Feature", "#bb87fc"], ["design", "Design", "#f2994a"], ["perf", "Performance", "#4cb782"],
+    ["docs", "Docs", "#4ea7fc"]].forEach(([id, name, color]) => { L[id] = put("IssueLabel", { id: "label-" + id, name, color, isGroup: false, teamId: team.id }) })
+  ;[["status-planned", "Planned", "planned", 0], ["status-started", "In Progress", "started", 1], ["status-completed", "Completed", "completed", 2]]
+    .forEach(([id, name, type, position]) => put("ProjectStatus", { id, name, type, position, color: "#5e6ad2" }))
+  const P = {
+    checkout: put("Project", { id: "project-checkout", name: "Checkout v2", color: "#4ea7fc", teamIds: [team.id], statusId: "status-started",
+      url: "https://linear.app/demo/project/checkout-v2", targetDate: dateIn(24), progress: 0.58, health: "onTrack", description: "" }),
+    onboarding: put("Project", { id: "project-onboarding", name: "Onboarding", color: "#4cb782", teamIds: [team.id], statusId: "status-started",
+      url: "https://linear.app/demo/project/onboarding", targetDate: dateIn(40), progress: 0.3, health: "atRisk", description: "" }),
+    perf: put("Project", { id: "project-perf", name: "Speed", color: "#f2994a", teamIds: [team.id], statusId: "status-planned",
+      url: "https://linear.app/demo/project/speed", progress: 0.1, health: "onTrack", description: "" })
+  }
+  put("ProjectMilestone", { id: "milestone-beta", name: "Public beta", projectId: P.checkout.id, targetDate: dateIn(10), sortOrder: 0 })
+  const cycle = put("Cycle", { id: "cycle-12", number: 12, name: "", teamId: team.id, startsAt: daysAgo(6), endsAt: new Date(Date.now() + 8 * 86400000).toISOString(),
+    isActive: true, isNext: false, isFuture: false, isPast: false, progress: 0.46 })
+  put("Cycle", { id: "cycle-13", number: 13, name: "", teamId: team.id, startsAt: cycle.endsAt, endsAt: new Date(Date.now() + 22 * 86400000).toISOString(),
+    isActive: false, isNext: true, isFuture: true, isPast: false, progress: 0 })
+  // [title, state, priority, assignee, project, labels, inCycle, estimate, due (days), description]
+  const rows = [
+    ["Apple Pay on the payment step", "started", 2, me, "checkout", ["feature"], true, 5, 3,
+      "Show Apple Pay next to the card form when the browser supports it.\n\n- [x] Merchant validation endpoint\n- [x] Payment sheet with the order total\n- [ ] Handle a cancelled sheet\n- [ ] Receipt email shows the wallet\n\nDesign: the button sits above the card fields, full width on mobile."],
+    ["Coupon field loses focus on mobile Safari", "started", 1, sam, "checkout", ["bug"], true, 2, 1, ""],
+    ["Order summary sticky on scroll", "review", 3, priya, "checkout", ["design"], true, 2, null, ""],
+    ["Address autocomplete for EU countries", "review", 2, jordan, "checkout", ["feature"], true, 3, 5, ""],
+    ["Retry failed card payments once", "unstarted", 2, me, "checkout", ["feature"], true, 3, 6, ""],
+    ["Empty cart shows a spinner forever", "unstarted", 1, null, "checkout", ["bug"], true, 1, null, ""],
+    ["Welcome checklist after sign-up", "unstarted", 3, priya, "onboarding", ["feature", "design"], true, 5, 9, ""],
+    ["Invite teammates step", "backlog", 3, null, "onboarding", ["feature"], false, 3, null, ""],
+    ["Sample project for new workspaces", "backlog", 4, null, "onboarding", [], false, 2, null, ""],
+    ["Lazy-load product images", "backlog", 2, jordan, "perf", ["perf"], false, 2, null, ""],
+    ["Cut the JS bundle below 200 kB", "unstarted", 2, sam, "perf", ["perf"], true, 8, null, ""],
+    ["Write the payments runbook", "backlog", 4, null, "checkout", ["docs"], false, 1, null, ""],
+    ["Gift cards in checkout", "backlog", 0, null, "checkout", ["feature"], false, null, null, ""],
+    ["Tax shown twice on invoices", "completed", 1, sam, "checkout", ["bug"], true, 2, null, ""],
+    ["New pricing page", "completed", 2, priya, "onboarding", ["design"], true, 3, null, ""],
+    ["Track checkout funnel events", "completed", 3, me, "checkout", ["feature"], true, 2, null, ""]
+  ]
+  rows.forEach(([title, state, priority, who, project, labels, inCycle, estimate, due, description], i) => {
+    const n = 140 + i
+    put("Issue", { id: "issue-" + n, number: n, identifier: "WEB-" + n, title, description, priority, stateId: st[state].id, teamId: team.id,
+      assigneeId: who ? who.id : null, projectId: P[project] ? P[project].id : null, labelIds: labels.map(l => L[l].id),
+      cycleId: inCycle ? cycle.id : null, estimate, dueDate: due === null ? null : dateIn(due), sortOrder: i * 10,
+      projectMilestoneId: project === "checkout" && i < 6 ? "milestone-beta" : null,
+      url: "https://linear.app/demo/issue/WEB-" + n, branchName: "alex/web-" + n, previousIdentifiers: [], creatorId: me.id,
+      createdAt: daysAgo(30 - i), updatedAt: daysAgo(5 - i / 4), completedAt: state === "completed" ? daysAgo(1 + i % 3) : null,
+      canceledAt: null, archivedAt: null, trashed: false, subscriberIds: [me.id] })
+  })
+  db.issueNumber = { [team.id]: 160, [mob.id]: 0 }
+  // Sub-issues of the Apple Pay work.
+  ;[["Merchant validation endpoint", "completed"], ["Payment sheet with the order total", "completed"], ["Handle a cancelled sheet", "started"]].forEach(([title, state], i) =>
+    put("Issue", { id: "issue-sub" + i, number: 161 + i, identifier: "WEB-" + (161 + i), title, description: "", priority: 0, stateId: st[state].id,
+      teamId: team.id, assigneeId: me.id, projectId: P.checkout.id, labelIds: [], parentId: "issue-140", sortOrder: 200 + i,
+      url: "https://linear.app/demo/issue/WEB-" + (161 + i), branchName: "", previousIdentifiers: [], createdAt: daysAgo(4), updatedAt: daysAgo(1),
+      completedAt: state === "completed" ? daysAgo(1) : null, archivedAt: null, trashed: false }))
+  db.issueNumber[team.id] = 163
+  put("Comment", { id: "comment-d1", body: "Merchant validation works on staging. The domain file is served from `/.well-known/` now.", issueId: "issue-140", userId: sam.id, createdAt: daysAgo(1.2) })
+  put("Comment", { id: "comment-d2", body: "Nice. I'll check the cancelled sheet case next.", issueId: "issue-140", userId: me.id, createdAt: daysAgo(1.1) })
+  put("Comment", { id: "comment-d3", body: "@alex can you check this on iOS 18? I only have an older phone.", issueId: "issue-141", userId: sam.id, createdAt: daysAgo(0.2) })
+  put("IssueRelation", { id: "relation-d1", type: "blocks", issueId: "issue-140", relatedIssueId: "issue-144" })
+  put("Attachment", { id: "attachment-d1", title: "Apple Pay on the Web: guidelines", subtitle: "developer.apple.com", url: "https://developer.apple.com/apple-pay/",
+    sourceType: "url", issueId: "issue-140" })
+  const note = (type, category, issueId, actor, mins, subtitle, extra) => put("IssueNotification", Object.assign({ type, category, issueId, userId: me.id,
+    actorId: actor ? actor.id : null, readAt: null, snoozedUntilAt: null, createdAt: new Date(Date.now() - mins * 60000).toISOString(),
+    groupingKey: "issue#" + issueId, title: db.byId[issueId].title, subtitle, inboxUrl: "https://linear.app/demo/inbox" }, extra || {}))
+  note("issueMention", "mentions", "issue-141", sam, 12, "Mentioned you by Sam Chen", { commentId: "comment-d3" })
+  note("issueAssignedToYou", "assignments", "issue-144", jordan, 48, "Assigned to you by Jordan Lee")
+  note("issueNewComment", "commentsAndReplies", "issue-140", sam, 95, "New comment by Sam Chen", { commentId: "comment-d1" })
+  note("issueStatusChanged", "statusChanges", "issue-142", priya, 180, "Moved to In Review by Priya Patel")
+  note("issuePriorityUrgent", "statusChanges", "issue-145", null, 260, "Marked urgent by Sentry", { botActorName: "Sentry" })
+  note("issueStatusChanged", "statusChanges", "issue-153", sam, 60 * 26, "Moved to Done by Sam Chen", { readAt: daysAgo(0.9) })
+  put("ProjectNotification", { type: "projectUpdateCreated", category: "postsAndUpdates", projectId: P.checkout.id, userId: me.id, actorId: priya.id,
+    readAt: null, snoozedUntilAt: null, createdAt: new Date(Date.now() - 300 * 60000).toISOString(), groupingKey: "project#" + P.checkout.id,
+    title: "Checkout v2", subtitle: "New project update by Priya Patel", inboxUrl: "https://linear.app/demo/inbox" })
+  put("ProjectUpdate", { id: "update-d1", body: "Apple Pay is in review, EU address autocomplete lands this week. Public beta still on track.",
+    health: "onTrack", projectId: P.checkout.id, userId: priya.id, createdAt: daysAgo(0.2) })
+}
+
 // ---- answering fields from the data ------------------------------------------------
 
 const lcfirst = s => s.charAt(0).toLowerCase() + s.slice(1)
@@ -477,6 +578,7 @@ function control(req, res, url, body) {
   if (p === "/_log") return json(res, 200, log)
   if (p === "/_sockets") return json(res, 200, { open: sockets.size, stalled: [...sockets].filter(x => x.stalled).length })
   if (p.startsWith("/_db/")) return json(res, 200, all(p.slice(5)))
+  if (p === "/_control/demo") { seedDemo(); faults = []; log = []; internalOn = true; return json(res, 200, { ok: true }) }
   if (p === "/_control/reset") { seed(); faults = []; log = []; internalOn = true; return json(res, 200, { ok: true }) }
   if (p === "/_control/fault") { faults.push(Object.assign({ times: 1, match: "." }, body)); return json(res, 200, { ok: true, faults }) }
   // Like a router after a suspend: connections open now are never answered
