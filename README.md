@@ -66,13 +66,39 @@ To bind the board yourself, use this command:
 omarchy-shell shell summon mani4.linear-board '{"toggle":true}'
 ```
 
-## Using it on several computers
+## What the board adds to Linear
 
-Some things don't exist in Linear, so the board keeps them on your computer: tracked time, recurring issues, project
-codes and board settings such as hidden columns, sorting and layout.
+Your issues, comments, projects and cycles live in Linear, and the board only shows and edits them. A few features
+don't exist in Linear, so the board adds them and keeps their data on your computer:
 
-To use the same data on several computers, set a shared folder in Settings → Data, for example a folder you sync with
-Syncthing. The board then keeps its time and settings files there:
+| Feature | What it does | Where the data is | Visible in Linear? |
+| --- | --- | --- | --- |
+| Time tracking | A timer on any issue, time added by hand, a report and CSV export | `time.json` on your computer | Only if you keep posting time as comments (on by default) |
+| Recurring issues | A new copy of an issue every day, weekday, week or month | `config.json` | The copies are normal Linear issues. The schedule isn't. |
+| Project codes | Short codes like `WEB` shown on cards | `config.json` | No |
+| Board settings | Hidden columns, sorting, grouping, layout, how long done issues stay | `config.json` | No |
+| Bar and notifications | Unread count in the bar and desktop notifications for new ones | Nothing to keep | They are your Linear notifications |
+| Offline queue | Changes made without a connection, sent later | `outbox.json` in the cache | Yes, once they are sent |
+
+Recurring issues are created by the board itself, so a copy is only created while the Omarchy shell is running. If
+the computer was off on that day, the board creates the latest missed copy when it starts.
+
+### Backup and moving to another computer
+
+Settings → Data → **Export everything** saves one file, `linear-board-export-<date>.json`, to `~/Downloads`. It
+contains your time entries (and a running timer), recurring issues, project codes and board settings. It doesn't
+contain your API key, your global shortcuts, or the team and filters the board is showing.
+
+On another computer, paste the file's path into **Import** in the same place. Import only adds what's missing, such as
+time entries, recurring issues, project codes and hidden columns. It never replaces or deletes anything, so you can
+import the same file twice without duplicates.
+
+For timesheets, the time report (`W`) exports the selected day, week or month as a CSV file to `~/Downloads`.
+
+### Using it on several computers
+
+To keep the same data on several computers all the time, set a shared folder in Settings → Data, for example a folder
+you sync with Syncthing. The board then keeps its time and settings files there:
 
 - A computer that points to a folder that already has these files uses them. Nothing there gets overwritten.
 - If the files are missing (the sync isn't finished yet, or a drive isn't mounted), the board waits for them and keeps
@@ -84,8 +110,11 @@ Syncthing. The board then keeps its time and settings files there:
 
 Each computer keeps its own selected team, project and filters, its shortcuts and its API key.
 
-**Export and import** (Settings → Data): Export saves everything above, except the API key, to one file in
-`~/Downloads`. Import only adds what's missing on this computer and never replaces anything.
+### If you uninstall
+
+Removing the plugin doesn't delete anything in Linear or on your computer. Your time, recurring issues and settings
+stay in the files listed under [Your files](#your-files). Export them first if you want a single file to keep.
+Recurring issues stop being created once the board is gone.
 
 ## Your files
 
