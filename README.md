@@ -1,169 +1,132 @@
 # Linear Board
 
-A kanban window for [Linear](https://linear.app) in the Omarchy shell: your team's issues in columns by
-workflow state, edited like in Linear and with Linear's keys, plus what Linear does not have: time tracking,
-recurring issues and an inbox count in the bar. Changes go to Linear at once, and wait when you are offline.
+A Kanban board for [Linear](https://linear.app) in the Omarchy shell. Your team's issues sit in columns by status, and you
+work with them the way you do in Linear, with the same shortcuts. It also adds what Linear doesn't have: time tracking,
+recurring issues and an unread count in the bar.
 
-![The board: a team's issues by workflow state, with a timer running](preview.png)
+Every change goes to Linear right away. If you're offline, changes wait and are sent when you're back.
+
+![The board with a team's issues by status and a timer running](preview.png)
 
 ## Install
 
-Requires Omarchy 4 and a Linear account.
+You need Omarchy 4 and a Linear account.
 
 ```bash
 omarchy plugin add https://github.com/MaNi4/omarchy-linear-board.git --enable
 ```
 
-## Remove
+## Getting started
 
-```bash
-omarchy plugin remove mani4.linear-board
-```
+1. Press `Super + Shift + K` to open the board.
+2. Paste a personal API key. You create one in Linear under Settings → Security & access. You can also set the
+   `LINEAR_API_KEY` environment variable instead.
 
-The global keys are released. Your settings, time entries and cache stay in the folders listed under
-[Files](#files); delete them by hand if you want them gone.
+Then:
 
-## First steps
+- Drag a card to another column, or move it with `Shift` + arrow keys.
+- Click a card to open it. Changes are saved as you make them, and `Ctrl+Z` undoes the last one.
+- Press `?` to see the shortcuts of the window you're in, or `Ctrl+K` to find any action by name.
+- Linear's shortcuts work too: `C` new issue, `S` status, `P` priority, `A` assignee, `G` then `I` inbox, and so on.
 
-`Super + Shift + K` toggles the board, `Super + Shift + Alt + K` opens it straight on a new issue. The first
-time, paste a personal API key from Linear → Settings → Security & access (or set `LINEAR_API_KEY`).
+## Features
 
-- **Drag** a card to another column, or move it with Shift + arrows. **Click** it to edit it: every change is
-  saved to Linear as you make it, and a toast undoes it (`Ctrl+Z`).
-- **`?`** (or `F1`, also while typing) shows the keys of the window you are in, and **`Ctrl+K`** finds any action
-  by name. Hovering a button shows what it does and its key.
-- **Linear's keys** work: C new issue, S status, P priority, A assignee, X select, G then I inbox, and so on.
-
-## What it does
-
-- **Board and list**: columns are the team's workflow states; sort, group, filter by label, assignee, priority
-  and cycle; pick several cards and change them at once.
-- **Issue editor**: all the properties, sub-issues, relations, links, comments with mentions and
-  reactions, history, Markdown with checklists, images and files (paste or drop).
-- **Search** every issue of every team, open a pasted Linear link or ID, **My issues** across teams.
-- **Inbox**: Linear's notifications, grouped like in Linear, with desktop notifications and an unread count in the bar.
-- **Cycles**, **project overview** (progress, milestones, updates), **triage**, **archive and trash**.
-- **Time tracking**: a timer on any issue, time added by hand, a report with CSV export; logged time can be posted
-  as a comment.
-- **Recurring issues**: every day, weekday, week or month; each copy is a new issue.
-- **Undo** for the last 30 changes, and an **offline** queue that sends changes when Linear is back.
+- **Board and list view.** Columns are your team's statuses. Sort, group and filter cards, or select several and change
+  them at once.
+- **Issue editor.** All issue properties, sub-issues, relations, links, comments with mentions and reactions, history,
+  Markdown with checklists, and images or files you paste or drop in.
+- **Search** across all your teams, open an issue from a pasted link or ID, and see your issues from every team.
+- **Inbox** with your Linear notifications, desktop notifications for new ones, and the unread count in the bar.
+- **Cycles, project overview** (progress, milestones, updates), **triage**, **archive and trash**.
+- **Time tracking.** Start a timer on any issue or add time by hand, see a report, export it to CSV, and optionally
+  post logged time to the issue as a comment.
+- **Recurring issues** every day, weekday, week or month.
+- **Undo** for the last 30 changes, and an **offline queue** that sends your changes once Linear is reachable.
 
 | Issue editor | Inbox | Project overview |
 |---|---|---|
 | ![An issue open in the editor](screenshots/editor.png) | ![The inbox](screenshots/inbox.png) | ![A project's progress, milestones and updates](screenshots/project.png) |
 
-The pictures show made-up data (`npm run screenshots` makes them again).
+The screenshots use made-up data. [FEATURES.md](FEATURES.md) describes every feature in detail.
 
-[FEATURES.md](FEATURES.md) describes every feature in detail.
+## Global shortcuts
 
-## What lives outside Linear
-
-Linear has no place for these, so the board keeps them itself:
-
-| What | Where (this computer only) | Shared folder |
-| --- | --- | --- |
-| Tracked time and the running timer | `~/.local/share/omarchy-linear-board/time.json` | `linear-time.json` |
-| Recurring issues | `~/.config/omarchy-linear-board/config.json` | `linear-board.json` |
-| Project codes | `config.json` | `linear-board.json` |
-| Hidden columns, sort, grouping, layout, completed issues shown | `config.json` | `linear-board.json` |
-| Time as Linear comments on/off, desktop notifications on/off | `config.json` | `linear-board.json` |
-| Team, project and assignee filter the board is on | `config.json` | not shared |
-| Global keys | `~/.config/omarchy/extensions/linear-board.json` | not shared (another computer may have them taken) |
-| API key | `~/.config/omarchy-linear-board/api-key` | never shared or exported |
-
-**Shared folder** (Settings → Data): type a folder, e.g. a Syncthing one such as `~/Sync/linear`, and press Apply. The time and settings files are kept there. A computer pointed at a folder that already has them uses those, and anything missing is copied from that computer. A file that should be there but is not (sync not finished, disk not mounted) is waited for and never replaced; until it shows up, changes stay on that computer. `config.json` keeps a copy of the shared settings, so the board works the same when the folder is gone. An empty field keeps everything on this computer again.
-
-If the same file is changed on two computers before they sync (one was offline), Syncthing keeps one version and leaves the other beside it as a `.sync-conflict` copy. The board finds such copies within 30 seconds, adds their time entries, recurring issues and project codes to the file in use (nothing is removed, so an entry deleted on one computer can come back from the other's copy) and deletes the copy; one it cannot read is left alone and reported. A recurring issue is made once a day even when two computers create it at the same moment: the board asks Linear first, and each copy has an id made from the rule and the day, so Linear refuses a second one.
-
-**Export and import** (Settings → Data): "Export everything" saves one JSON file to `~/Downloads` with all of the above except the API key, the global keys and where the board is. Import only adds what is missing on this computer (time entries, recurring issues, project codes, hidden columns) and never replaces anything. Older time-only exports import too.
-
-## Global keys
-
-| Key | Action |
+| Shortcut | Action |
 | --- | --- |
-| Super + Shift + K | Show or hide the board |
-| Super + Alt + Shift + K | New issue |
+| `Super + Shift + K` | Show or hide the board |
+| `Super + Alt + Shift + K` | New issue |
 
-Change them in Settings → Keys: pick a free key from the list or type your own (e.g. `super + alt + l`), or choose "No key". They are kept in `~/.config/omarchy/extensions/linear-board.json`:
+You can change them in Settings → Keys. The board never takes a shortcut that's already in use. If one is taken, a
+notification tells you, and clicking it opens Settings → Keys. The shortcuts are saved in
+`~/.config/omarchy/extensions/linear-board.json`.
 
-```json
-{
-  "hotkey": "SUPER + SHIFT + K",
-  "newIssueHotkey": "SUPER + ALT + SHIFT + K"
-}
+To bind the board yourself, use this command:
+
+```bash
+omarchy-shell shell summon mani4.linear-board '{"toggle":true}'
 ```
 
-The plugin never overrides a key that is already in use: one notification names the taken keys, and clicking it opens Settings → Keys, where taken keys show what holds them. Keys are bound in the running Hyprland session (`hyprctl eval`), bound again after Hyprland reloads its config, and released when the plugin is disabled or removed.
+## Using it on several computers
 
-Without a key, the same as a command (e.g. for your own binding):
+Some things don't exist in Linear, so the board keeps them on your computer: tracked time, recurring issues, project
+codes and board settings such as hidden columns, sorting and layout.
 
-    omarchy-shell shell summon mani4.linear-board '{"toggle":true}'
+To use the same data on several computers, set a shared folder in Settings → Data, for example a folder you sync with
+Syncthing. The board then keeps its time and settings files there:
 
-## Files
+- A computer that points to a folder that already has these files uses them. Nothing there gets overwritten.
+- If the files are missing (the sync isn't finished yet, or a drive isn't mounted), the board waits for them and keeps
+  changes on this computer in the meantime.
+- If both computers changed something before they synced, Syncthing keeps a second copy with `sync-conflict` in its
+  name. The board merges that copy within 30 seconds, so no time entries or recurring issues are lost. An entry you
+  deleted on one computer can come back from the other computer's copy.
+- A recurring issue is created only once, even when two computers create it at the same moment.
 
-- `~/.config/omarchy-linear-board/config.json`: selected team, project, filters, hidden columns, layout, project codes and recurring issues
-- `~/.config/omarchy-linear-board/api-key`: the Linear API key (the folder is readable only by you)
-- `~/.config/omarchy-linear-board/time-location`: the shared folder, if one is set
-- `~/.local/share/omarchy-linear-board/time.json`: tracked time, when no shared folder is set
-- `<shared folder>/linear-time.json` and `<shared folder>/linear-board.json`: time and settings, when one is set
-- `~/.config/omarchy/extensions/linear-board.json`: the global keys
-- `~/.cache/omarchy-linear-board/cache.json`: the last board, so it shows instantly while it refreshes
-- `~/.cache/omarchy-linear-board/outbox.json`: changes made offline, waiting to be sent
-- `$XDG_RUNTIME_DIR/omarchy-linear-board/inbox.json`: unread count and running timer for the bar widget
+Each computer keeps its own selected team, project and filters, its shortcuts and its API key.
+
+**Export and import** (Settings → Data): Export saves everything above, except the API key, to one file in
+`~/Downloads`. Import only adds what's missing on this computer and never replaces anything.
+
+## Your files
+
+| File | What's in it |
+| --- | --- |
+| `~/.config/omarchy-linear-board/config.json` | Selected team and project, filters, board settings, project codes, recurring issues |
+| `~/.config/omarchy-linear-board/api-key` | Your Linear API key, readable only by you |
+| `~/.config/omarchy-linear-board/time-location` | The shared folder, if you set one |
+| `~/.local/share/omarchy-linear-board/time.json` | Tracked time, when there's no shared folder |
+| `<shared folder>/linear-time.json`, `linear-board.json` | Time and settings, when there is a shared folder |
+| `~/.config/omarchy/extensions/linear-board.json` | Global shortcuts |
+| `~/.cache/omarchy-linear-board/` | The last loaded board (so it opens instantly), changes waiting to be sent, downloaded images |
+
+## Troubleshooting
+
+- **The bar icon is dimmed.** The unread count is more than 5 minutes old, usually because Linear can't be reached.
+  The tooltip says since when and why.
+- **"Offline · N waiting" in the header.** Your changes are saved and will be sent once Linear responds again.
+- **After waking the computer from sleep,** the first request can take a few seconds. The board notices stale
+  connections and opens new ones by itself.
+- **"Linear's rate limit was reached".** Linear allows only so many requests per hour. The board waits until the
+  limit resets and sends your changes then.
+- **"Linear rejected the API key".** The key was revoked or has expired. Create a new one in Linear and paste it in.
+
+## Uninstall
+
+```bash
+omarchy plugin remove mani4.linear-board
+```
+
+The global shortcuts are removed. Your settings, time and cache stay in the folders listed under
+[Your files](#your-files). Delete them if you don't need them.
 
 ## Requirements
 
-- Omarchy 4 (the shell, Hyprland, `curl`, `wl-clipboard`, Python with GObject: all come with Omarchy).
-- A Linear account and a personal API key. The free plan works (the board shows how many of its 250 issues are used).
+- Omarchy 4. Everything else the board uses (`curl`, `wl-clipboard`, Python with GObject) comes with it.
+- A Linear account and a personal API key. The free plan works, and the board shows how many of its 250 issues you use.
 
-## How it works
+## Development
 
-- `Board.qml`: the overlay itself: state, Linear requests, config and cache, lookups, cursor and the window.
-- `ui/`: what is drawn: the board and list (`BoardView` with `BoardHeader`, `BoardColumn`, `IssueCard`, `ListGroup`), the issue editor (`IssueEditor` with `EditorHeader`, `EditorLinks`, `EditorActivity`, `EditorSidebar`), settings, time report, inbox, search and lists, command palette, project overview, shortcut help, toast, confirm, plus small parts (`Label`, `Chip`, `MarkdownView`…).
-- `logic/`: what happens: `EditorState` (the issue being edited, id `ed`), `Notices` (toasts and desktop notifications, id `notices`), `Sync` (offline outbox, loading), `TimeTracker` (also the time report's state), `SharedFolder` (the shared folder, export and import), `InboxCtl` (also the inbox state), `Lists` (also the search state), `Undoer`, `IssueOps`, `EditorOps`, `Uploads`, `Workspace`, `Commands`, `ProjectOps`, `Pickers` (also the open picker and the confirmation box), `Bulk` (also drag and drop), `Keyboard`. `Board.qml` keeps what the whole board shares: the connection, the team's data, the filters, the cursor and the theme.
-- `bin/linear-notify`: sends desktop notifications over D-Bus. It reads them on stdin, so issue titles and inbox text never show up in process listings (they would with `notify-send` arguments). A click runs its action through Omarchy's notifications (`omarchy-exec-argv`), also later from the notification history.
-- `Linear.js`: only what the board says to Linear's API and how it reads the answers (queries, mutations, filters, inputs, Linear's fixed values, errors).
-- What the board does on top of Linear, as pure helpers: `Issues.js` (columns, filters, search, sorting, moving cards, project codes, copying), `Edit.js` (what an edit sends and what undoes it), `Recur.js` (recurring issues), `Inbox.js` (inbox filter, paging, the bar's view of the inbox state), `Markdown.js` (checklists, images, mentions), `Dates.js`.
-- `Time.js` (time tracker data), `Shared.js` (shared settings, export and import), `Help.js` (shortcut help), `Hotkey.js` and `Service.qml` (the global keys), `BarWidget.qml` (bar badge and timer).
-
-When things go wrong:
-
-- A request Linear does not answer is given up after 30 seconds. A change whose answer is lost waits in the outbox; a new issue or comment carries its own id, so sending it again never makes a second one (Linear refuses the copy and the board takes the first).
-- Changes reach Linear in the order they were made: while some wait in the outbox, new ones queue behind them, and changes to one issue go out one at a time. An older change the network still delivers after the newer one was sent is noticed (Linear is checked 15 s, 1 and 3 minutes later) and the newer values are sent again.
-- After a suspend or a network change, connections from before it can hang without an error, and Qt keeps reusing them. The board notices waking up (requests then give up after 8 s), and after a hung request it sends requests through `curl`, a fresh connection each, for 15 minutes. Loading a team that got no answer is tried again.
-- The inbox is checked every minute. A check that never comes back is given up after 5 minutes, and an answer that cannot be read does not stop the next checks. When the bar's count is more than 5 minutes old, its icon dims and the tooltip says since when and why.
-- After a plugin reload an old board can still be running; the bar follows the one that started last.
-- The inbox uses fields Linear marks internal (unread count, grouping, titles). Should Linear turn them off, the inbox switches to its public fields and makes them up the same way (newest 200 notifications).
-- Linear's rate limit: no request goes out until Linear's reset time (at most an hour), and changes wait in the outbox meanwhile.
-- A list cut off by the page limit says so instead of looking complete.
-
-Every file in `ui/` and `logic/` is created inside `Board.qml` (the editor's parts inside `IssueEditor.qml`) and reaches the board through the id `root` and the other parts through their ids (`editor`, `issueOps`…).
-
-## Tests
-
-    npm install    # once: the graphql package, for the API check
-    npm test
-
-- `tests/helpers.test.js`, `time.test.js`, `shared.test.js`, `hotkey.test.js`: the pure helpers.
-- `tests/refs.test.js`: every `Linear.x`, `Issues.x`… a QML or JS file uses exists in that file and is imported; no unused imports.
-- `tests/members.test.js`: every `root.x`, `pickers.x`, `ed.x`… one part of the board uses from another exists there.
-- `tests/api.test.js`: every query and mutation, the input fields the board sends, and the filters and inputs it builds (the issue editor's saves and their undo included), checked against Linear's current schema (downloaded from linear/linear). It fails when something is gone or deprecated. `LINEAR_SCHEMA=live LINEAR_API_KEY=… node tests/api.test.js` reads the schema from the API itself.
-
-End to end, on an Omarchy machine:
-
-    npm run test:e2e        # or: node tests/e2e/run.js <name filter>
-
-`tests/e2e/run.js` starts `tests/fake-linear.js`, a stand-in for Linear's API that answers from made-up data (a team, issues, an inbox) against Linear's schema, and runs the board with its bar widget in a separate, offscreen Quickshell with its files in a temporary directory. Nothing shows on the desktop and nothing reaches Linear or your own files; desktop notifications, `hyprctl`, `wl-copy` and `xdg-open` are stubs. It covers loading, edits, the offline outbox, rate limits, timeouts, broken answers, a wrong or revoked key, the inbox and its fallback, desktop notifications, paging and the bar widget. The fake server also works by hand: `node tests/fake-linear.js`, then start a shell with `LINEAR_BOARD_ENDPOINT=http://127.0.0.1:47123/graphql LINEAR_API_KEY=lin_api_fake` (only an address on this machine is accepted there).
-
-`tests/e2e/shared.js` runs two such boards as two computers sharing a folder (Settings → Data): time and settings reach the other one, Syncthing's `.sync-conflict` copies are merged (time entries and recurring rules from both are kept), and a recurring issue due on both at the same moment is made once.
-
-Against the real API, in a Linear project kept for testing (everything it makes is named `[bt] …` and deleted at the end; the inbox is only read):
-
-    LINEAR_TEST_PROJECT=<project id> node tests/e2e/live.js
-
-The board's requests then go through a local proxy that can lose, delay or refuse them, so the outbox, rate limit and lost-answer cases also run against Linear's real answers. `LIVE_CURL=1` sends every request through curl (as after a hung connection), `LIVE_DIRECT=1` skips the proxy (its failure tests then do not apply).
-
-GitHub Actions runs `npm test` on every push and every morning, so a change in Linear's API fails a run (GitHub sends an email). With a `LINEAR_API_KEY` repository secret it also checks the live API's schema and that Linear still answers the internal inbox fields; a read-only key limited to one team is enough.
+[DEVELOPMENT.md](DEVELOPMENT.md) explains how the code is organized and how to run the tests.
 
 ## License
 

@@ -6,7 +6,7 @@
   "author": "MaNi4",
   "license": "MIT",
   "homepage": "https://github.com/MaNi4/omarchy-linear-board",
-  "description": "Kanban board window for Linear: issues by workflow state, drag and drop between columns, labels, projects, assignees, due dates, estimates, cycles (editing them too), sub-issues, comments, the trash and the Linear inbox, with an unread count in the bar",
+  "description": "A Kanban board for Linear: drag issues between statuses, edit everything an issue has, track time, and see unread notifications in the bar",
   "kinds": [
     "overlay",
     "bar-widget",
@@ -20,7 +20,7 @@
   },
   "barWidget": {
     "displayName": "Linear inbox",
-    "description": "Unread Linear notifications; click for the inbox, right click for the board",
+    "description": "Unread Linear notifications. Click for the inbox, right-click for the board",
     "category": "Development",
     "aliases": [
       "linear",
