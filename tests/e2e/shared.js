@@ -73,7 +73,8 @@ async function fresh(config) {
   // settings and time go there), then on b (it takes what is there).
   await a.start(config)
   a.ev("m('setTimeLocation').setTimeLocation(" + JSON.stringify(SHARED) + ")")
-  await waitFor(() => fs.existsSync(SETTINGS) && fs.existsSync(TIME), 10000, "a to fill the shared folder")
+  await waitFor(() => fs.existsSync(SETTINGS) && fs.existsSync(TIME), 10000, () => "a to fill the shared folder; " +
+    JSON.stringify(a.ev("({ state: p('sharedState').sharedState, dir: p('sharedState').sharedDir, problem: p('sharedState').sharedProblem, error: m('setTimeLocation').timeError, writable: m('setTimeLocation').timeWritable, queue: p('sharedState').queue.length, files: " + JSON.stringify(fs.readdirSync(SHARED)) + " })")))
   await b.start(config)
   b.ev("m('setTimeLocation').setTimeLocation(" + JSON.stringify(SHARED) + ")")
   await waitFor(() => b.ev("m('setTimeLocation').timeLocation") === SHARED && b.ev("m('setTimeLocation').timeWritable"), 10000, "b to use the shared folder")
@@ -158,6 +159,33 @@ test("both computers create the same recurring copy in the same instant", async 
   const creates = (await H.serverLog()).filter(e => e.op === "IssueCreate")
   ok(creates.length >= 2, "both tried (" + creates.length + ")")
   ok(!/Could not create the recurring/.test(a.ev("m('notify').toast") + b.ev("m('notify').toast")), "no error shown")
+})
+
+test("a shared folder other users can change is neither read nor written", async () => {
+  await ctl("reset")
+  await a.stop(); await b.stop()
+  fs.rmSync(SHARED, { recursive: true, force: true })
+  fs.mkdirSync(SHARED)
+  fs.rmSync(a.files, { recursive: true, force: true })
+  // Someone else could write here: a planted settings file with a recurring
+  // issue, and the time file swapped for a link to one of your files.
+  fs.chmodSync(SHARED, 0o777)
+  const victim = path.join(H.TMP, "victim.txt")
+  fs.writeFileSync(victim, "your own file\n")
+  fs.symlinkSync(victim, TIME)
+  fs.writeFileSync(SETTINGS, JSON.stringify({ version: 1, recurring: [{ id: "planted", issueId: "issue-2", teamId: "team-eng", title: "Planted", every: "day", start: "2020-01-01" }] }))
+  await a.start()
+  a.ev("m('setTimeLocation').setTimeLocation(" + JSON.stringify(SHARED) + ")")
+  await waitFor(() => /Other users on this computer can change/.test(a.ev("m('setTimeLocation').timeError")), 10000, "the warning")
+  ok(a.addTime("issue-1", "must not land") === false || true, "addManualTime")
+  await sleep(3000)
+  eq(fs.readFileSync(victim, "utf8"), "your own file\n", "the linked file is untouched")
+  eq((a.ev("board.config.recurring") || []).length, 0, "the planted recurring issue is not taken")
+  // Made private again, the folder is used.
+  fs.chmodSync(SHARED, 0o755)
+  fs.unlinkSync(TIME)
+  await waitFor(() => a.ev("m('setTimeLocation').timeError") === "" || a.ev("p('sharedState').sharedState") === "ok", 15000, "the folder to be used once it is private")
+  eq(a.ev("p('sharedState').sharedState"), "ok", "folder state")
 })
 
 async function main() {

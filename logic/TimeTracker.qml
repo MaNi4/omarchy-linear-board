@@ -37,6 +37,7 @@ Item {
   // The chosen location is a single line in ~/.config/omarchy-linear-board/time-location;
   // the shared settings (SharedFolder.qml) use the same folder.
   property string timeLocation: ""
+  property var moveHere: null   // { path, data }: entries to write into a newly chosen folder
   property bool timeLocationLoaded: false
   property var timeData: Time.emptyData()
   property bool timeWritable: false
@@ -75,7 +76,7 @@ Item {
 
   FileView {
     id: timeFile
-    path: timeTracker.timeLocationLoaded ? timeTracker.timePath : ""
+    path: timeTracker.timeLocationLoaded && privateFiles.sharedUsable ? timeTracker.timePath : ""
     watchChanges: true
     printErrors: false
     atomicWrites: true
@@ -103,6 +104,13 @@ Item {
         timeTracker.timeData = Time.emptyData()
         timeTracker.timeWritable = true
         timeTracker.timeError = ""
+      } else if (timeTracker.moveHere && timeTracker.moveHere.path === timeTracker.timePath) {
+        // A folder just chosen, with no time file yet: this computer's goes there.
+        var data = timeTracker.moveHere.data
+        timeTracker.moveHere = null
+        timeTracker.timeWritable = true
+        timeTracker.timeError = ""
+        timeTracker.saveTime(data)
       } else {
         // A chosen location that is not there (disk not mounted, sync not
         // finished): never start an empty file in its place.
@@ -361,11 +369,15 @@ Item {
       privateFiles.write(timeLocationFile, location ? location + "\n" : "")
       timeTracker.timeLocation = location
       if (!timeExists) {
-        // Nothing there yet: the current entries move along.
-        timeTracker.timeWritable = true
-        timeTracker.timeError = ""
-        timeTracker.saveTime(keep)
-      }
+        // Nothing there yet: the current entries move along, once the
+        // folder is checked (PrivateFiles) and the time file is looked up.
+        timeTracker.moveHere = location ? { path: target, data: keep } : null
+        if (!location) {
+          timeTracker.timeWritable = true
+          timeTracker.timeError = ""
+          timeTracker.saveTime(keep)
+        }
+      } else timeTracker.moveHere = null
       var where = target.replace(root.home, "~").replace(/\/[^\/]*$/, "")
       if (!location) notices.notify("Shared folder turned off. Everything is kept on this computer (" + where + ").")
       else if (timeExists || settingsExist) notices.notify("Using what is already in " + where + " (time" + (timeExists ? "" : ": moved from here") + ", recurring issues and settings" + (settingsExist ? "" : ": copied from here") + ")")

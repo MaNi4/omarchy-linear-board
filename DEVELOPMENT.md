@@ -53,6 +53,8 @@ All requests go through `gqlWith` in `Board.qml`. A few things there aren't obvi
   up on requests after 8 seconds for a minute. After a hung request, it sends requests through `curl`, which opens
   a new connection each time, for the next 15 minutes. Loading a team that got no answer is retried after 2, 5 and
   10 seconds.
+- **The API key never goes into a process's arguments,** which other users can read in `/proc`. `curl` gets it as a
+  config on stdin.
 - **Rate limit.** On HTTP 429 or the `RATELIMITED` error, no request goes out until Linear's reset time (at most an
   hour). Changes wait in the queue.
 - **Internal inbox fields.** The inbox uses fields Linear marks as internal (unread count, grouping, titles). If
@@ -93,8 +95,9 @@ npm run test:e2e
   API with test data. The fake server can drop, delay or refuse requests, which covers the offline queue, rate
   limits, timeouts, broken answers, a wrong or revoked key, the inbox fallback, paging and a simulated suspend.
   Pass a name filter to run only some scenarios: `node tests/e2e/run.js inbox`.
-- `tests/e2e/shared.js` (6 scenarios) runs two boards as two computers with a shared folder: time and settings
-  reach the other computer, Syncthing conflict copies are merged, and a recurring issue is created once.
+- `tests/e2e/shared.js` (7 scenarios) runs two boards as two computers with a shared folder: time and settings
+  reach the other computer, Syncthing conflict copies are merged, a recurring issue is created once, and a folder
+  other users can change is neither read nor written.
 
 To try the board against the fake server yourself, start `node tests/fake-linear.js`, then start a shell with
 `LINEAR_BOARD_ENDPOINT=http://127.0.0.1:47123/graphql LINEAR_API_KEY=lin_api_fake`. Only addresses on this machine

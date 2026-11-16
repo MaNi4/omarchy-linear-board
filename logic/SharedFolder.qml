@@ -20,7 +20,7 @@ Item {
     var p = timeTracker.timePath
     return p.substring(0, p.lastIndexOf("/"))
   }
-  readonly property string path: shared.folder ? shared.folder + "/" + Shared.FILE_NAME : ""
+  readonly property string path: shared.folder && privateFiles.sharedUsable ? shared.folder + "/" + Shared.FILE_NAME : ""
   property bool writable: false
   property string error: ""
   // Set while a new folder is being taken into use: when linear-board.json

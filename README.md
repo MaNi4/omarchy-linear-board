@@ -100,6 +100,8 @@ For timesheets, the time report (`W`) exports the selected day, week or month as
 To keep the same data on several computers all the time, set a shared folder in Settings → Data, for example a folder
 you sync with Syncthing. The board then keeps its time and settings files there:
 
+- The folder has to be yours only. If other users on the computer can change it, the board doesn't read or write
+  anything there and tells you how to fix it (`chmod go-w <folder>`).
 - A computer that points to a folder that already has these files uses them. Nothing there gets overwritten.
 - If the files are missing (the sync isn't finished yet, or a drive isn't mounted), the board waits for them and keeps
   changes on this computer in the meantime.

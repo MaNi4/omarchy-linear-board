@@ -44,10 +44,12 @@ Item {
     imageProc.url = url
     // The file name: the URL without its scheme, made safe. Only http(s) is
     // fetched: an image link in someone's description must not make curl
-    // read a local file (file://) or speak another protocol.
+    // read a local file (file://) or speak another protocol. The API key
+    // reaches curl as a config on stdin (printf is a shell builtin), never in
+    // an argument other users could read in /proc.
     var name = url.replace(/^https?:\/\//, "").replace(/[?#].*$/, "").replace(/[^A-Za-z0-9._-]+/g, "_").slice(-150)
     imageProc.command = ["sh", "-c", 'umask 077; d="$2/images"; mkdir -p "$d"; f="$d/$3"; ' +
-      'if [ ! -s "$f" ]; then case "$1" in https://uploads.linear.app/*) curl -sSfL --proto =https --proto-redir =https --max-filesize 20000000 -H "Authorization: $LINEAR_KEY" -o "$f.part" -- "$1";; ' +
+      'if [ ! -s "$f" ]; then case "$1" in https://uploads.linear.app/*) printf \'header = "Authorization: %s"\\n\' "$LINEAR_KEY" | curl -sSfL --proto =https --proto-redir =https --max-filesize 20000000 -K - -o "$f.part" -- "$1";; ' +
       '*) curl -sSfL --proto =http,https --proto-redir =http,https --max-filesize 20000000 -o "$f.part" -- "$1";; esac && mv "$f.part" "$f" || { rm -f "$f.part"; exit 1; }; fi; ' +
       'case "$(file -b --mime-type -- "$f")" in image/*) ;; *) rm -f -- "$f"; exit 3;; esac; ' +
       'printf "%s\n%s\n" "$f" "$(file -b -- "$f")"', "sh", url, root.cacheDir, name]
