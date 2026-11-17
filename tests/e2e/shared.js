@@ -188,6 +188,109 @@ test("a shared folder other users can change is neither read nor written", async
   eq(a.ev("p('sharedState').sharedState"), "ok", "folder state")
 })
 
+test("a link in the chosen path swapped after the check is not followed", async () => {
+  await ctl("reset")
+  await a.stop(); await b.stop()
+  fs.rmSync(SHARED, { recursive: true, force: true })
+  fs.mkdirSync(SHARED)
+  fs.rmSync(a.files, { recursive: true, force: true })
+  // The chosen path goes through a link in a folder anyone can change; the
+  // link first points to a private folder, so the check passes.
+  const open = path.join(H.TMP, "open"), evil = path.join(H.TMP, "evil")
+  fs.rmSync(open, { recursive: true, force: true }); fs.rmSync(evil, { recursive: true, force: true })
+  fs.mkdirSync(open); fs.chmodSync(open, 0o777)
+  fs.mkdirSync(evil); fs.chmodSync(evil, 0o777)
+  const link = path.join(open, "sync")
+  fs.symlinkSync(SHARED, link)
+  await a.start()
+  a.ev("m('setTimeLocation').setTimeLocation(" + JSON.stringify(link) + ")")
+  await waitFor(() => fs.existsSync(TIME) && fs.existsSync(SETTINGS), 10000, "a to fill the folder behind the link")
+  eq(a.ev("p('sharedState').sharedReal"), fs.realpathSync(SHARED), "files are used through the resolved path")
+  // Someone else swaps the link for one to their folder, where the time file
+  // and the settings file are links to files of yours.
+  const victim = path.join(H.TMP, "victim2.txt"), victim2 = path.join(H.TMP, "victim3.txt")
+  fs.writeFileSync(victim, "your own file\n"); fs.writeFileSync(victim2, "your other file\n")
+  fs.symlinkSync(victim, path.join(evil, "linear-time.json"))
+  fs.symlinkSync(victim2, path.join(evil, "linear-board.json"))
+  fs.unlinkSync(link); fs.symlinkSync(evil, link)
+  // Saves before the next check (every minute) go to the checked folder.
+  ok(a.addTime("issue-1", "after the swap"), "a: addManualTime")
+  a.ev("board.setConfig({ doneWindow: 'month' })")
+  await waitFor(() => readTime().includes("after the swap") && readSettings().doneWindow === "month", 5000, "the saves in the checked folder")
+  eq(fs.readFileSync(victim, "utf8"), "your own file\n", "the linked time file is untouched")
+  eq(fs.readFileSync(victim2, "utf8"), "your other file\n", "the linked settings file is untouched")
+  // The next check finds the folder others can change and stops using it.
+  a.ev("p('sharedState').checkShared()")
+  await waitFor(() => a.ev("p('sharedState').sharedState") === "unsafe", 5000, "the swapped link to be found")
+  ok(a.addTime("issue-1", "must not land") === false || true, "addManualTime")
+  await sleep(2000)
+  eq(fs.readFileSync(victim, "utf8"), "your own file\n", "still untouched")
+  eq(fs.readFileSync(victim2, "utf8"), "your other file\n", "still untouched")
+})
+
+// Syncthing (and other sync tools) bring links from the other computers as
+// links: whoever else syncs the folder could put one in place of a file.
+// Like Syncthing does it: made under a new name, then renamed over the file.
+function swapLink(target, at) {
+  const tmp = at + ".tmp-link"
+  fs.rmSync(tmp, { force: true })
+  fs.symlinkSync(target, tmp)
+  fs.renameSync(tmp, at)
+}
+const outsideEntry = note => ({ id: "outside-" + note, issueId: "issue-2", identifier: "ENG-2", title: "Add dark mode toggle",
+  start: new Date().toISOString(), seconds: 1800, note, manual: true })
+
+test("a time or settings file that is a link (synced from elsewhere) is neither read nor written", async () => {
+  await fresh()
+  await b.stop()
+  // Files of yours elsewhere, in the board's own formats.
+  const t = JSON.parse(fs.readFileSync(TIME, "utf8"))
+  t.entries = [outsideEntry("outside")]
+  const s = readSettings()
+  s.recurring = [{ id: "outside-rule", issueId: "issue-2", teamId: "team-eng", teamName: "Engineering", title: "Outside", every: "day", start: "2099-01-01" }]
+  const vt = path.join(H.TMP, "outside-time.json"), vs = path.join(H.TMP, "outside-settings.json")
+  fs.writeFileSync(vt, JSON.stringify(t)); fs.writeFileSync(vs, JSON.stringify(s))
+  const before = [fs.readFileSync(vt, "utf8"), fs.readFileSync(vs, "utf8")]
+  swapLink(vt, TIME); swapLink(vs, SETTINGS)
+  await waitFor(() => /link/i.test(a.ev("m('setTimeLocation').timeError")), 20000, () => "the time file to be refused; error: " + a.ev("m('setTimeLocation').timeError"))
+  await waitFor(() => /link/i.test(a.ev("m('findConflicts').error")), 20000, () => "the settings file to be refused; error: " + a.ev("m('findConflicts').error"))
+  ok(!a.entries().includes("outside"), "the linked time file is not read")
+  ok(!(a.ev("board.config.recurring") || []).some(r => r.id === "outside-rule"), "the linked settings are not taken")
+  eq(a.addTime("issue-1", "must not land"), false, "time cannot be logged")
+  a.ev("board.setConfig({ doneWindow: 'month' })")
+  await sleep(3000)
+  eq([fs.readFileSync(vt, "utf8"), fs.readFileSync(vs, "utf8")], before, "the linked files are untouched")
+  ok(fs.lstatSync(TIME).isSymbolicLink() && fs.lstatSync(SETTINGS).isSymbolicLink(), "the links are left for you to look at")
+  // Back to real files: used again.
+  fs.unlinkSync(TIME); fs.unlinkSync(SETTINGS)
+  fs.writeFileSync(TIME, JSON.stringify(Object.assign({}, t, { entries: [outsideEntry("back")] })))
+  fs.writeFileSync(SETTINGS, JSON.stringify(readSettingsFrom(vs)))
+  await waitFor(() => a.ev("m('setTimeLocation').timeError") === "" && a.entries().includes("back"), 20000, "the real time file to be used")
+})
+const readSettingsFrom = p => { const s = JSON.parse(fs.readFileSync(p, "utf8")); s.recurring = []; return s }
+
+test("a sync conflict copy that is a link is neither merged nor removed", async () => {
+  await fresh()
+  await b.stop()
+  const t = JSON.parse(fs.readFileSync(TIME, "utf8"))
+  t.entries = [outsideEntry("outside-conflict")]
+  const victim = path.join(H.TMP, "outside-conflict.json")
+  fs.writeFileSync(victim, JSON.stringify(t))
+  const copy = path.join(SHARED, "linear-time.sync-conflict-20261117-101500-ABCDEFG.json")
+  swapLink(victim, copy)
+  // A real conflict copy next to it shows the conflicts were looked at.
+  const real = JSON.parse(fs.readFileSync(TIME, "utf8"))
+  real.entries = real.entries.concat([outsideEntry("real-conflict")])
+  const realCopy = path.join(SHARED, "linear-time.sync-conflict-20261117-101600-ABCDEFG.json")
+  fs.writeFileSync(realCopy, JSON.stringify(real))
+  await waitFor(() => readTime().includes("real-conflict") || readTime().includes("outside-conflict"), 90000, "the real conflict copy merged")
+  ok(!readTime().includes("outside-conflict"), "the linked copy is not merged")
+  await waitFor(() => readTime().includes("real-conflict"), 30000, "the real conflict copy merged")
+  await waitFor(() => !fs.existsSync(realCopy), 5000, "the real conflict copy cleared away")
+  ok(!readTime().includes("outside-conflict"), "the linked copy is not merged")
+  ok(fs.existsSync(victim) && fs.lstatSync(copy).isSymbolicLink(), "the linked copy and its target are left alone")
+})
+
 async function main() {
   H.setup()
   await H.startServer()

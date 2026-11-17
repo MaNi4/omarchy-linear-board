@@ -20,7 +20,8 @@ Item {
     var p = timeTracker.timePath
     return p.substring(0, p.lastIndexOf("/"))
   }
-  readonly property string path: shared.folder && privateFiles.sharedUsable ? shared.folder + "/" + Shared.FILE_NAME : ""
+  // Read and written through the folder's checked, link-free path.
+  readonly property string path: shared.folder ? privateFiles.realPath(Shared.FILE_NAME) : ""
   property bool writable: false
   property string error: ""
   // Set while a new folder is being taken into use: when linear-board.json
@@ -36,14 +37,11 @@ Item {
     privateFiles.write(sharedFile, Shared.serialize(root.config))
   }
 
-  FileView {
+  // Read and written without following links (see SharedFile).
+  SharedFile {
     id: sharedFile
     // Only after config.json is read, so the local copy never overwrites what came from the folder.
     path: root.configLoaded ? shared.path : ""
-    watchChanges: true
-    printErrors: false
-    atomicWrites: true
-    onFileChanged: reload()
     onSaveFailed: function(error) { notices.notify("Could not save " + shared.path.replace(root.home, "~") + ": " + error, true) }
     onLoaded: {
       shared.createIfMissing = false
@@ -58,8 +56,15 @@ Item {
       var next = Shared.apply(root.config, r.data)
       if (Shared.differs(root.config, next)) root.applySharedConfig(next)
     }
-    onLoadFailed: {
+    onLoadFailed: function(why) {
       if (!shared.path) return
+      if (why !== "missing") {
+        shared.writable = false
+        shared.error = (why === "link"
+          ? "The shared settings " + shared.folder.replace(root.home, "~") + "/" + Shared.FILE_NAME + " are a link. The board doesn't follow links in the shared folder (whoever else syncs it could point one at a file of yours), so they are neither read nor written until it is the file itself."
+          : "The shared settings in " + shared.folder.replace(root.home, "~") + " cannot be read.") + " Until then, changes stay on this computer."
+        return
+      }
       // A new folder with no settings yet, or one this computer already
       // keeps its time in (set before the settings were shared): make it.
       if (shared.createIfMissing || (timeTracker.timeWritable && timeTracker.timeError === "")) {
@@ -76,7 +81,8 @@ Item {
     }
   }
 
-  // Watching misses a file that appears later, so read it again now and then.
+  // Changes from another computer (and a file that appears later) are
+  // picked up by reading again now and then.
   Timer {
     interval: shared.error !== "" ? 5000 : 15000
     repeat: true
@@ -101,10 +107,10 @@ Item {
     onTriggered: shared.findConflicts()
   }
   function findConflicts() {
-    if (conflictFind.running || shared.conflictQueue.length) return
+    if (conflictFind.running || shared.conflictQueue.length || !privateFiles.sharedReal) return
     var timeName = timeTracker.timePath.substring(timeTracker.timePath.lastIndexOf("/") + 1)
-    conflictFind.command = ["sh", "-c", 'cd "$1" 2>/dev/null || exit 0; for f in $2 $3; do [ -f "$f" ] && printf "%s\\n" "$PWD/$f"; done; exit 0',
-      "sh", shared.folder, Shared.conflictGlob(timeName), Shared.conflictGlob(Shared.FILE_NAME)]
+    conflictFind.command = ["sh", "-c", 'cd "$1" 2>/dev/null || exit 0; for f in $2 $3; do case "$f" in *"\n"*) continue;; esac; [ -f "$f" ] && [ ! -L "$f" ] && printf "%s\\n" "$PWD/$f"; done; exit 0',
+      "sh", privateFiles.sharedReal, Shared.conflictGlob(timeName), Shared.conflictGlob(Shared.FILE_NAME)]
     conflictFind.running = true
   }
   Process {
@@ -117,11 +123,11 @@ Item {
       conflictFile.path = found[0]
     }
   }
-  FileView {
+  // Links are not listed above, and not read here either if one appears in between.
+  SharedFile {
     id: conflictFile
-    printErrors: false
     onLoaded: shared.mergeConflict(conflictFile.path, text())
-    onLoadFailed: shared.nextConflict(false)
+    onLoadFailed: function(why) { shared.nextConflict(false, why === "link" ? "it is a link" : "") }
   }
   function mergeConflict(file, text) {
     var isSettings = file.substring(file.lastIndexOf("/") + 1).indexOf(Shared.FILE_NAME.replace(/\.json$/, "") + ".sync-conflict-") === 0

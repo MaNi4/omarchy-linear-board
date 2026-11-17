@@ -77,6 +77,14 @@ function loadStuck(loadingSinceMs, nowMs) {
 // the bar says so instead of showing an old count as current.
 var STALE_MS = 5 * 60000
 
+// The folder for inbox.json, which the board writes and the bar widget
+// reads: in XDG_RUNTIME_DIR (private to you), else in the board's cache
+// folder. Never a fixed path in /tmp, which another user could make first
+// and fill with links.
+function stateDir(xdgRuntimeDir, cacheDir) {
+  return xdgRuntimeDir ? xdgRuntimeDir + "/omarchy-linear-board" : cacheDir + "/run"
+}
+
 // What the bar widget shows for the state the board wrote (inbox.json):
 // { stale, note }. note is "" when all is well.
 function barHealth(state, nowMs) {

@@ -32,10 +32,11 @@ Column {
   readonly property var parts: Markdown.splitParts(markdown)
   readonly property string linkHex: String(root.accent).length === 7 ? String(root.accent) : "#" + String(root.accent).slice(3)
   spacing: Style.spacing.sm
-  onMarkdownChanged: uploads.requestImages(Markdown.markdownImages(markdown))
+  // Only Linear's own uploads are fetched to show inline; other images stay links (Markdown.autoImage).
+  onMarkdownChanged: uploads.requestImages(Markdown.markdownImages(markdown).filter(Markdown.autoImage))
   // The parts are drawn anew: a box the mouse was over is gone.
   onPartsChanged: hoveredLink = ""
-  Component.onCompleted: uploads.requestImages(Markdown.markdownImages(markdown))
+  Component.onCompleted: uploads.requestImages(Markdown.markdownImages(markdown).filter(Markdown.autoImage))
 
   Repeater {
     model: mdv.parts

@@ -11,6 +11,7 @@ import "Linear.js" as Linear
 import "Dates.js" as Dates
 import "Issues.js" as Issues
 import "Shared.js" as Shared
+import "Inbox.js" as Inbox
 import "ui"
 import "logic"
 
@@ -33,7 +34,7 @@ Item {
   readonly property string endpoint: Linear.endpointFor(Quickshell.env("LINEAR_BOARD_ENDPOINT"))
   // Shared with the bar widget: unread count and the latest unread notifications.
   readonly property string dataDir: (Quickshell.env("XDG_DATA_HOME") || (home + "/.local/share")) + "/omarchy-linear-board"
-  readonly property string runtimeDir: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/omarchy-linear-board"
+  readonly property string runtimeDir: Inbox.stateDir(Quickshell.env("XDG_RUNTIME_DIR") || "", root.cacheDir)
   property bool dirsReady: false
   property bool configLoaded: false    // config.json read (or missing); the shared folder waits for it
 

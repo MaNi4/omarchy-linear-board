@@ -188,9 +188,13 @@ function totalsByIssue(entries) {
 
 // ---- CSV ----------------------------------------------------------------------------
 
+// Titles, project names and notes come from Linear, where anyone in the
+// team writes them: a cell a spreadsheet would take for a formula (= + - @,
+// or a tab or CR before one) starts with ' and is shown as text.
 function csvCell(v) {
   var s = String(v === undefined || v === null ? "" : v)
-  return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s
+  return /[",\n\r;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
 }
 
 // One row per entry, oldest first, in local time.

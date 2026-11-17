@@ -49,6 +49,9 @@ Item {
     if (!loc) return root.dataDir + "/time.json"
     return /\.json$/i.test(loc) ? loc : loc.replace(/\/+$/, "") + "/linear-time.json"
   }
+  // Where the time file is read and written: in a shared folder, through
+  // the folder's checked, link-free path (PrivateFiles.sharedReal).
+  readonly property string timeFilePath: timeTracker.timeLocation ? privateFiles.realPath(timeTracker.timePath.substring(timeTracker.timePath.lastIndexOf("/") + 1)) : timeTracker.timePath
   readonly property var running: timeTracker.timeData.running
   readonly property int runningSeconds: timeTracker.running ? Math.max(0, Math.floor((timeTracker.nowMs - new Date(timeTracker.running.startedAt).getTime()) / 1000)) : 0
   readonly property var timeTotals: Time.totalsByIssue(timeTracker.timeData.entries)
@@ -74,13 +77,12 @@ Item {
     onLoadFailed: timeTracker.timeLocationLoaded = true
   }
 
-  FileView {
+  // Read and written without following links in the shared folder (see
+  // SharedFile); the default file in the board's own folder may be a link.
+  SharedFile {
     id: timeFile
-    path: timeTracker.timeLocationLoaded && privateFiles.sharedUsable ? timeTracker.timePath : ""
-    watchChanges: true
-    printErrors: false
-    atomicWrites: true
-    onFileChanged: reload()
+    path: timeTracker.timeLocationLoaded ? timeTracker.timeFilePath : ""
+    followLinks: !timeTracker.timeLocation
     onSaveFailed: function(error) {
       console.warn("linear-board: time file save failed: " + error)
       notices.notify("Could not save the time file: " + error, true)
@@ -98,8 +100,13 @@ Item {
       timeTracker.nowMs = Date.now()
       inboxCtl.writeInboxState()
     }
-    onLoadFailed: {
-      if (!timeTracker.timeLocation) {
+    onLoadFailed: function(why) {
+      if (why !== "missing") {
+        timeTracker.timeWritable = false
+        timeTracker.timeError = (why === "link"
+          ? "The time file " + timeTracker.timePath.replace(root.home, "~") + " is a link. The board doesn't follow links in the shared folder (whoever else syncs it could point one at a file of yours), so nothing is read or written until it is the file itself."
+          : "The time file " + timeTracker.timePath.replace(root.home, "~") + " cannot be read" + (why === "other" ? " (it is not a regular file)." : ".")) + " Looking again every few seconds."
+      } else if (!timeTracker.timeLocation) {
         // First use: the default file is made on the first write.
         timeTracker.timeData = Time.emptyData()
         timeTracker.timeWritable = true
@@ -120,8 +127,9 @@ Item {
     }
   }
 
-  // Watching misses a file that appears later (first sync from another
-  // computer, a disk mounted after start), so read it again every few seconds.
+  // Changes from another computer (and a file that appears later: first
+  // sync, a disk mounted after start) are picked up by reading again every
+  // few seconds.
   Timer {
     interval: timeTracker.timeError !== "" ? 5000 : 10000
     repeat: true

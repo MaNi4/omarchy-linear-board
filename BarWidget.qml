@@ -21,7 +21,9 @@ BarWidget {
   property var state: null             // what the board last wrote
   property string followed: ""         // startedAt of the board the bar follows
   readonly property var health: Inbox.barHealth(root.state, root.nowMs)
-  readonly property string statePath: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/omarchy-linear-board/inbox.json"
+  // Where the board writes it (Board.qml runtimeDir).
+  readonly property string statePath: Inbox.stateDir(Quickshell.env("XDG_RUNTIME_DIR") || "",
+    (Quickshell.env("XDG_CACHE_HOME") || (Quickshell.env("HOME") + "/.cache")) + "/omarchy-linear-board") + "/inbox.json"
 
   implicitWidth: (timerButton.visible ? timerButton.implicitWidth : 0) + button.implicitWidth
   implicitHeight: button.implicitHeight

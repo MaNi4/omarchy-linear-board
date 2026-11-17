@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+"""Read or write one file in the board's shared folder, never through a link.
+
+  linear-file read PATH      the file's content on stdout
+  linear-file write PATH     stdin becomes the file's content
+  linear-file tighten PATH   a file others can read becomes private (0600)
+  --follow before PATH: links are followed (files of the board's own
+  folders, where a link is yours).
+
+The shared folder (the time file, linear-board.json, sync conflict copies)
+is filled by a sync tool from other computers, and whoever else syncs it can
+put a link in place of any file there; Syncthing keeps links as links. So a
+read never follows a link (nothing of yours elsewhere is read and synced
+back), and a write makes a new private file next to the old one and renames
+it over the name: a link there is replaced, its target is never touched,
+however late the link appeared.
+
+Exit codes: 0 done, 2 missing, 3 a link, 4 not a regular file, 1 any other
+error (on stderr), 64 wrong arguments.
+"""
+import errno
+import os
+import stat
+import sys
+import tempfile
+
+LIMIT = 64 * 1024 * 1024   # the board's files are small; never read without end
+
+
+def read(path):
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+    except FileNotFoundError:
+        return 2
+    except OSError as e:
+        if e.errno == errno.ELOOP:
+            return 3
+        if e.errno in (errno.EISDIR, errno.ENXIO):
+            return 4
+        raise
+    if not stat.S_ISREG(os.fstat(fd).st_mode):
+        os.close(fd)
+        return 4
+    with os.fdopen(fd, "rb") as f:
+        data = f.read(LIMIT + 1)
+    if len(data) > LIMIT:
+        print("linear-file: %s is too big" % path, file=sys.stderr)
+        return 1
+    sys.stdout.buffer.write(data)
+    return 0
+
+
+def write(path, data=None):
+    if data is None:
+        data = sys.stdin.buffer.read()
+    folder = os.path.dirname(path) or "."
+    # mkstemp: O_EXCL, mode 0600, a name nobody else chose.
+    fd, tmp = tempfile.mkstemp(dir=folder, prefix="." + os.path.basename(path) + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+            f.flush()
+            os.fsync(f.fileno())
+        # rename(2) replaces whatever has the name, a link included, and
+        # never follows it. A link to a folder: rename refuses, so take the
+        # link away first (only a link, never a real folder).
+        try:
+            os.replace(tmp, path)
+        except IsADirectoryError:
+            if not os.path.islink(path):
+                raise
+            os.unlink(path)
+            os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+    return 0
+
+
+def tighten(path):
+    """The same content in a new 0600 file, when others could read it."""
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+    except OSError as e:
+        return {errno.ENOENT: 2, errno.ELOOP: 3}.get(e.errno, 4)
+    with os.fdopen(fd, "rb") as f:
+        st = os.fstat(f.fileno())
+        if not stat.S_ISREG(st.st_mode):
+            return 4
+        if st.st_mode & 0o077 == 0:
+            return 0
+        data = f.read(LIMIT + 1)
+    if len(data) > LIMIT:
+        return 1
+    return write(path, data)
+
+
+def main():
+    args = sys.argv[1:]
+    follow = len(args) == 3 and args[1] == "--follow"
+    if follow:
+        args = [args[0], args[2]]
+    if len(args) != 2 or args[0] not in ("read", "write", "tighten"):
+        print("\n".join(__doc__.strip().splitlines()[2:7]), file=sys.stderr)
+        return 64
+    path = os.path.realpath(args[1]) if follow else args[1]
+    try:
+        return {"read": read, "write": write, "tighten": tighten}[args[0]](path)
+    except OSError as e:
+        print("linear-file: %s" % e.strerror if e.strerror else "linear-file: %s" % e, file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

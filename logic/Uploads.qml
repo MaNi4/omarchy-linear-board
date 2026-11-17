@@ -23,7 +23,7 @@ Item {
   property var imageCache: ({})        // url → { path, w, h } | "pending" | "failed"
   property var imageQueue: []
   function requestImages(urls) {
-    var add = (urls || []).filter(function(u) { return !(u in uploads.imageCache) && uploads.imageQueue.indexOf(u) < 0 })
+    var add = (urls || []).filter(function(u) { return Markdown.autoImage(u) && !(u in uploads.imageCache) && uploads.imageQueue.indexOf(u) < 0 })
     if (!add.length || !root.apiKey) return
     var c = {}
     for (var k in uploads.imageCache) c[k] = uploads.imageCache[k]
@@ -42,16 +42,21 @@ Item {
     var url = uploads.imageQueue[0]
     if (!url) return
     imageProc.url = url
-    // The file name: the URL without its scheme, made safe. Only http(s) is
-    // fetched: an image link in someone's description must not make curl
-    // read a local file (file://) or speak another protocol. The API key
-    // reaches curl as a config on stdin (printf is a shell builtin), never in
-    // an argument other users could read in /proc.
-    var name = url.replace(/^https?:\/\//, "").replace(/[?#].*$/, "").replace(/[^A-Za-z0-9._-]+/g, "_").slice(-150)
+    // Only Linear's own uploads (Markdown.autoImage), over https: any other
+    // image in someone's text would tell its server who opened the issue,
+    // or make this computer request a local address. The file name: the
+    // URL's path made safe, with a hash of the whole URL so two URLs never
+    // share a file. The API key reaches curl as a config on stdin (printf is
+    // a shell builtin), never in an argument other users could read in
+    // /proc. A server that stalls gives up after a minute, so the queue
+    // moves on. Only PNG, JPEG, GIF and WebP are kept (no SVG, which a
+    // click would open in a browser).
+    if (!Markdown.autoImage(url)) { uploads.setImage(url, "failed"); uploads.imageQueue = uploads.imageQueue.slice(1); Qt.callLater(uploads.nextImage); return }
+    var name = Qt.md5(url).slice(0, 16) + "-" + url.replace(/^https:\/\/uploads\.linear\.app\//, "").replace(/[?#].*$/, "").replace(/[^A-Za-z0-9._-]+/g, "_").slice(-100)
     imageProc.command = ["sh", "-c", 'umask 077; d="$2/images"; mkdir -p "$d"; f="$d/$3"; ' +
-      'if [ ! -s "$f" ]; then case "$1" in https://uploads.linear.app/*) printf \'header = "Authorization: %s"\\n\' "$LINEAR_KEY" | curl -sSfL --proto =https --proto-redir =https --max-filesize 20000000 -K - -o "$f.part" -- "$1";; ' +
-      '*) curl -sSfL --proto =http,https --proto-redir =http,https --max-filesize 20000000 -o "$f.part" -- "$1";; esac && mv "$f.part" "$f" || { rm -f "$f.part"; exit 1; }; fi; ' +
-      'case "$(file -b --mime-type -- "$f")" in image/*) ;; *) rm -f -- "$f"; exit 3;; esac; ' +
+      'if [ ! -s "$f" ]; then case "$1" in https://uploads.linear.app/*) printf \'header = "Authorization: %s"\\n\' "$LINEAR_KEY" | curl -sSfL --proto =https --proto-redir =https --connect-timeout 15 --max-time 60 --max-filesize 20000000 -K - -o "$f.part" -- "$1";; ' +
+      '*) exit 1;; esac && mv "$f.part" "$f" || { rm -f "$f.part"; exit 1; }; fi; ' +
+      'case "$(file -b --mime-type -- "$f")" in image/png|image/jpeg|image/gif|image/webp) ;; *) rm -f -- "$f"; exit 3;; esac; ' +
       'printf "%s\n%s\n" "$f" "$(file -b -- "$f")"', "sh", url, root.cacheDir, name]
     imageProc.running = true
   }

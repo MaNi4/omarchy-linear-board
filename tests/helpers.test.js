@@ -100,6 +100,12 @@ const cs = L.sortComments([{ createdAt: "2026-02" }, { createdAt: "2026-01" }].m
 assert.deepStrictEqual(plain(cs.map(c => c.id)), ["2026-01", "2026-02"])
 assert.strictEqual(L.cycleLabel(L.toCycles([{ id: "c", number: 4, isActive: true }])[0]), "Cycle 4 (current)")
 
+// The runtime folder (inbox.json for the bar widget): never a fixed path in
+// /tmp, which another user could make first and fill with links.
+assert.strictEqual(L.stateDir("/run/user/1000", "/home/u/.cache/omarchy-linear-board"), "/run/user/1000/omarchy-linear-board")
+assert.strictEqual(L.stateDir("", "/home/u/.cache/omarchy-linear-board"), "/home/u/.cache/omarchy-linear-board/run")
+assert.strictEqual(L.stateDir(undefined, "/c"), "/c/run")
+
 // inbox
 const inbox = L.toInbox([
   { id: "a", title: "Old", createdAt: "2026-10-01T10:00:00Z", readAt: null },
@@ -173,6 +179,20 @@ assert.strictEqual(L.displayMarkdown("hi https://linear.app/acme/profiles/ann an
   'hi <a href="https://linear.app/acme/profiles/ann" style="text-decoration:none"><span style="color:#ffcc00"><b>@ann</b></span></a>' +
   ' and <a href="https://d.io/a"><span style="color:#ffcc00">docs</span></a>')
 assert.strictEqual(L.displayMarkdown("see https://x.io/a<b>", "#fff"), 'see <a href="https://x.io/a"><span style="color:#fff">https://x.io/a</span></a>&lt;b>')
+// Only Linear's own uploads are fetched without asking: any other image in
+// issue text (anyone in the workspace writes it) would tell its server who
+// opened the issue and when, or make this computer request a local address.
+assert.ok(L.autoImage("https://uploads.linear.app/org/a/b.png"))
+for (const u of ["http://uploads.linear.app/a.png", "https://uploads.linear.app.evil.io/a.png", "https://uploads.linear.app@evil.io/a.png",
+  "https://evil.io/uploads.linear.app/a.png", "https://evil.io/x.png", "HTTPS://evil.io/x.png", "http://127.0.0.1:631/x.png", ""])
+  assert.ok(!L.autoImage(u), u)
+// No image syntax reaches Qt's Markdown, which loads an image from any
+// server: whatever shape it has, it is shown as a link (or as text).
+// tests/qt-images.test.js shows the same to Qt itself.
+for (const md of ["![a [b]](HTTP://t.io/p.gif)", "![x][r]\n\n[r]: HTTP://t.io/p.gif", "![x](<http://t.io/p.gif>)", "![x]( http://t.io/p.gif )",
+  "![x](\nhttp://t.io/p.gif)", "`` ![a [b]](HTTP://t.io/p.gif) `", "```a`b\n![a [b]](HTTP://t.io/p.gif)\n```", "\\\\![a [b]](HTTP://t.io/p.gif)",
+  "[![a [b]](HTTP://t.io/p.gif)](https://x.io)", "![x](https://u/x.png)"])
+  for (const color of ["", "#fff"]) assert.ok(!L.displayMarkdown(md, color).includes("!["), JSON.stringify(md) + " " + color + " → " + JSON.stringify(L.displayMarkdown(md, color)))
 // Raw HTML from issue text is shown as text, code is left alone.
 assert.strictEqual(L.displayMarkdown('<img src="http://t.io/p.gif"> a < b'), '&lt;img src="http://t.io/p.gif"> a < b')
 assert.strictEqual(L.displayMarkdown("use `<div>` here"), "use `<div>` here")

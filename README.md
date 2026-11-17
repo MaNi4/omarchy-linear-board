@@ -34,7 +34,8 @@ Then:
 - **Board and list view.** Columns are your team's statuses. Sort, group and filter cards, or select several and change
   them at once.
 - **Issue editor.** All issue properties, sub-issues, relations, links, comments with mentions and reactions, history,
-  Markdown with checklists, and images or files you paste or drop in.
+  Markdown with checklists, and images or files you paste or drop in. Images uploaded to Linear are shown in the issue;
+  images from other sites show as links, so their servers don't learn when you open the issue.
 - **Search** across all your teams, open an issue from a pasted link or ID, and see your issues from every team.
 - **Inbox** with your Linear notifications, desktop notifications for new ones, and the unread count in the bar.
 - **Cycles, project overview** (progress, milestones, updates), **triage**, **archive and trash**.
@@ -102,6 +103,9 @@ you sync with Syncthing. The board then keeps its time and settings files there:
 
 - The folder has to be yours only. If other users on the computer can change it, the board doesn't read or write
   anything there and tells you how to fix it (`chmod go-w <folder>`).
+- The board's files there have to be files, not links. Sync tools keep links as links, so whoever else syncs the folder
+  could point one at a file of yours. The board never reads or writes through such a link and says so.
+- Changes from another computer show up within about 15 seconds of the sync.
 - A computer that points to a folder that already has these files uses them. Nothing there gets overwritten.
 - If the files are missing (the sync isn't finished yet, or a drive isn't mounted), the board waits for them and keeps
   changes on this computer in the meantime.

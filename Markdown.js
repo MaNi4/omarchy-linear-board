@@ -35,6 +35,14 @@ function htmlLink(text, url, color) {
     '<span style="color:' + color + '">' + body + "</span></a>"
 }
 
+// Images fetched without asking, to show inline: only Linear's own uploads.
+// Any other image in issue text (anyone in the workspace writes it) would
+// tell its server who opened the issue and when, or make this computer
+// request a local address; those stay links, opened in the browser.
+function autoImage(url) {
+  return /^https:\/\/uploads\.linear\.app\//.test(String(url || ""))
+}
+
 // Image URLs in Markdown (![alt](url)), for downloading them to show inline.
 function markdownImages(md) {
   var out = [], re = /!\[[^\]]*\]\((https?:\/\/[^)\s]+)[^)]*\)/g, m
@@ -153,9 +161,16 @@ function listEnter(text, cursor) {
 // Markdown as the editor shows it: images become links (splitImages takes
 // them out first where the board can draw them), profile links read as
 // @mentions, and with linkColor every link is drawn in that color.
+// Qt's Markdown loads an image from any server, so no image syntax reaches
+// it: an image this does not turn into a link (nested brackets, reference
+// style, `` and ``` tricks…) gets an invisible word joiner between ! and [,
+// which leaves a plain link. Everywhere, code included: what counts as code
+// is Qt's call, and a guess here would be a way around this.
+var NO_IMAGE = "!\u2060["
 function displayMarkdown(md, linkColor) {
   var out = escapeRawHtml(md)
     .replace(/!\[([^\]]*)\]\(([^)\s]+)[^)]*\)/g, function(m, alt, url) { return "[🖼 " + (alt || "image") + "](" + url + ")" })
+    .replace(/!\[/g, NO_IMAGE)
     .replace(/(^|[^(\[])(https:\/\/linear\.app\/[^\/\s]+\/profiles\/([A-Za-z0-9._-]+))/g, function(m, pre, url, user) {
       return pre + "[@" + user + "](" + url + ")"
     })

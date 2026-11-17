@@ -11,6 +11,8 @@ import QtQuick
 // Part of the Linear board (mani4.linear-board): created in Board.qml as
 // `privateFiles`. Everything that writes private data calls
 // privateFiles.write(fileView, text) instead of fileView.setText(text).
+// A SharedFile (the time file, linear-board.json) writes a new 0600 file
+// every time and never through a link, so it needs no first write here.
 Item {
   id: privateFiles
   visible: false
@@ -18,12 +20,12 @@ Item {
   property var ready: ({})   // path → true once this session wrote it 0600
   property var queue: []     // [{ view, path, text }]
 
-  // view: a FileView with atomicWrites; text: its whole new content.
+  // view: a FileView with atomicWrites, or a SharedFile; text: its whole new content.
   function write(view, text) {
     var path = String(view.path || "")
     if (!path) return
-    if (privateFiles.ready[path] && !privateFiles.queue.length && !privateFiles.inShared(path)) { view.setText(text); return }
-    if (privateFiles.ready[path] && !privateFiles.queue.length && privateFiles.sharedState === "ok") { view.setText(text); return }
+    var direct = view.safeWrites === true || privateFiles.ready[path]
+    if (direct && !privateFiles.queue.length && (!privateFiles.inShared(path) || privateFiles.inSafeShared(path))) { view.setText(text); return }
     privateFiles.queue = privateFiles.queue.concat([{ view: view, path: path, text: String(text) }])
     privateFiles.next()
   }
@@ -31,12 +33,12 @@ Item {
   function next() {
     while (privateFiles.queue.length && !firstWrite.running) {
       var job = privateFiles.queue[0]
-      if (privateFiles.inShared(job.path) && privateFiles.sharedState !== "ok") {
+      if (privateFiles.inShared(job.path) && !privateFiles.inSafeShared(job.path)) {
         if (privateFiles.sharedState === "checking") return   // folderCheck calls next() when done
-        privateFiles.queue = privateFiles.queue.slice(1)       // missing or unsafe: not written
+        privateFiles.queue = privateFiles.queue.slice(1)       // missing, unsafe or another folder: not written
         continue
       }
-      if (!privateFiles.ready[job.path]) {
+      if (job.view.safeWrites !== true && !privateFiles.ready[job.path]) {
         firstWrite.job = job
         firstWrite.command = ["sh", "-c", firstWrite.script, "sh", job.path]
         firstWrite.running = true
@@ -72,8 +74,9 @@ Item {
   }
 
   // Existing files that are readable by others are copied to a fresh 0600
-  // inode. The board's own folders are done at start (Board.qml); the files
-  // in a shared folder when it is known.
+  // inode. The board's own folders are done at start (Board.qml), following
+  // links (they are yours); the files in a shared folder when it is known,
+  // through bin/linear-file, which leaves a link alone.
   function tighten(paths) {
     var list = (paths || []).filter(function(p) { return !!p })
     if (!list.length) return
@@ -83,8 +86,10 @@ Item {
     '[ "$(stat -c %a -- "$f")" = 600 ] && continue; t="$f.tmp-$$"; rm -f -- "$t"; ' +
     '(set -C; cat -- "$f" > "$t") && mv -f -- "$t" "$f" || rm -f -- "$t"; done'
 
-  readonly property string sharedFiles: timeTracker.timeLocation && privateFiles.sharedState === "ok" ? timeTracker.timePath + "\n" + shared.path : ""
-  onSharedFilesChanged: if (privateFiles.sharedFiles) privateFiles.tighten(privateFiles.sharedFiles.split("\n"))
+  readonly property string sharedFiles: timeTracker.timeLocation && privateFiles.sharedUsable ? timeTracker.timeFilePath + "\n" + shared.path : ""
+  onSharedFilesChanged: if (privateFiles.sharedFiles) privateFiles.sharedFiles.split("\n").forEach(function(p) {
+    if (p) Quickshell.execDetached(["python3", "-I", root.pluginDir + "bin/linear-file", "tighten", p])
+  })
 
   // ---- the shared folder ----
   // Its files are read and written only when no other user can change the
@@ -93,34 +98,68 @@ Item {
   // plant settings such as recurring issues. The folder must belong to you
   // (or root) and not be writable by others; every folder above it too,
   // except shared ones with the sticky bit such as /tmp.
+  // The check resolves links in the chosen path, and the files are then read
+  // and written only through that resolved path (sharedReal): a link in the
+  // chosen path that someone else could swap after the check is never
+  // followed again.
   // sharedState: "" (no shared folder), checking, ok, missing, unsafe.
   readonly property string sharedDir: timeTracker.timeLocation ? timeTracker.timePath.substring(0, timeTracker.timePath.lastIndexOf("/")) : ""
   property string sharedState: ""
+  property string sharedReal: ""        // sharedDir with links resolved, set only when it is ok
+  property var sharedSeen: ({})         // every sharedReal so far, so queued writes there are recognised
   property string sharedProblem: ""     // the folder others can change
-  readonly property bool sharedUsable: !privateFiles.sharedDir || privateFiles.sharedState === "ok"
-  function inShared(path) { return !!privateFiles.sharedDir && String(path).indexOf(privateFiles.sharedDir + "/") === 0 }
+  readonly property bool sharedUsable: !privateFiles.sharedDir || (privateFiles.sharedState === "ok" && !!privateFiles.sharedReal)
+  function under(path, dir) { return !!dir && String(path).indexOf(dir + "/") === 0 }
+  function inShared(path) {
+    if (!privateFiles.sharedDir) return false
+    if (privateFiles.under(path, privateFiles.sharedDir)) return true
+    for (var d in privateFiles.sharedSeen) if (privateFiles.under(path, d)) return true
+    return false
+  }
+  // In the folder as it was last checked and found safe.
+  function inSafeShared(path) { return privateFiles.sharedState === "ok" && privateFiles.under(path, privateFiles.sharedReal) }
+  function realPath(name) { return privateFiles.sharedUsable && privateFiles.sharedReal ? privateFiles.sharedReal + "/" + name : "" }
 
-  onSharedDirChanged: privateFiles.checkShared()
+  onSharedDirChanged: {
+    // Another folder: nothing is read or written until it is checked.
+    privateFiles.sharedReal = ""
+    privateFiles.sharedState = privateFiles.sharedDir ? "checking" : ""
+    privateFiles.checkShared()
+  }
   function checkShared() {
-    if (!privateFiles.sharedDir) { privateFiles.sharedState = ""; return }
+    if (!privateFiles.sharedDir) { privateFiles.sharedState = ""; privateFiles.sharedReal = ""; return }
     if (folderCheck.running) return
     if (privateFiles.sharedState !== "ok") privateFiles.sharedState = "checking"
+    folderCheck.dir = privateFiles.sharedDir
     folderCheck.command = ["sh", "-c", folderCheck.script, "sh", privateFiles.sharedDir]
     folderCheck.running = true
   }
   Process {
     id: folderCheck
+    property string dir: ""
     readonly property string script: 'd=$(readlink -f -- "$1") && [ -d "$d" ] || { echo missing; exit 0; }; u=$(id -u); p=$d; leaf=1; ' +
       'while :; do s=$(stat -c "%u %a" -- "$p") || { echo "unsafe $p"; exit 0; }; o=${s% *}; m=$((0${s#* })); ' +
       'if [ "$o" != "$u" ] && [ "$o" != 0 ]; then echo "unsafe $p"; exit 0; fi; ' +
       'if [ $((m & 18)) -ne 0 ] && { [ $leaf = 1 ] || [ $((m & 512)) -eq 0 ]; }; then echo "unsafe $p"; exit 0; fi; ' +
-      '[ "$p" = / ] && break; p=$(dirname -- "$p"); leaf=0; done; echo ok'
+      '[ "$p" = / ] && break; p=$(dirname -- "$p"); leaf=0; done; printf "ok %s\\n" "$d"'
     stdout: StdioCollector { id: folderOut }
     onExited: {
-      var out = folderOut.text.trim()
+      // The folder changed while it was checked: check the new one.
+      if (folderCheck.dir !== privateFiles.sharedDir) { Qt.callLater(privateFiles.checkShared); return }
+      var out = folderOut.text.replace(/\n$/, "")
       var was = privateFiles.sharedState
-      if (out === "ok") privateFiles.sharedState = "ok"
-      else if (out.indexOf("unsafe ") === 0) {
+      if (out.indexOf("ok /") === 0 && out.indexOf("\n") < 0) {
+        var real = out.slice(3)
+        if (!privateFiles.sharedSeen[real]) {
+          var seen = {}
+          for (var k in privateFiles.sharedSeen) seen[k] = true
+          seen[real] = true
+          privateFiles.sharedSeen = seen
+        }
+        privateFiles.sharedReal = real
+        privateFiles.sharedState = "ok"
+      } else if (out.indexOf("unsafe ") === 0) {
+        privateFiles.sharedReal = ""
         privateFiles.sharedState = "unsafe"
         privateFiles.sharedProblem = out.slice(7)
         timeTracker.timeWritable = false
@@ -128,6 +167,7 @@ Item {
           ", so the board doesn't read or write its files there. Make it yours only, for example: chmod go-w " + privateFiles.sharedProblem.replace(root.home, "~")
         if (was !== "unsafe") notices.notify(timeTracker.timeError, true)
       } else {
+        privateFiles.sharedReal = ""
         privateFiles.sharedState = "missing"
         timeTracker.timeWritable = false
         timeTracker.timeError = "The shared folder " + privateFiles.sharedDir.replace(root.home, "~") + " isn't there yet (not synced or not mounted?). Looking again every few seconds; until then nothing is written."
