@@ -59,11 +59,18 @@ function computer(name) {
   return pc
 }
 
+// A disk that fails writes (full, read-only, quota): bin/linear-file is run
+// through python3, and the stub put first on PATH in main() makes every
+// write of the file named here fail. "" puts writes back to normal.
+const FAIL_WRITES = path.join(H.TMP, "fail-writes")
+const failWrites = name => fs.writeFileSync(FAIL_WRITES, name)
+
 const readTime = () => JSON.parse(fs.readFileSync(TIME, "utf8")).entries.map(e => e.note).sort()
 const readSettings = () => JSON.parse(fs.readFileSync(SETTINGS, "utf8"))
 
 let a, b
 async function fresh(config) {
+  failWrites("")
   await ctl("reset")
   await a.stop(); await b.stop()
   fs.rmSync(SHARED, { recursive: true, force: true })
@@ -116,7 +123,7 @@ test("both computers logged time while out of sync: Syncthing's conflict copy is
   fs.writeFileSync(conflict, JSON.stringify(bData))
   await waitFor(() => readTime().includes("b offline"), 90000, "the conflict copy merged into the time file")
   eq(readTime(), ["a offline", "b offline"], "both entries")
-  await waitFor(() => !fs.existsSync(conflict), 5000, "the conflict copy cleared away")
+  await waitFor(() => !fs.existsSync(conflict), 45000, "the conflict copy cleared away (on the next pass)")
 })
 
 test("conflicting settings files: recurring rules from both are kept", async () => {
@@ -286,13 +293,84 @@ test("a sync conflict copy that is a link is neither merged nor removed", async 
   await waitFor(() => readTime().includes("real-conflict") || readTime().includes("outside-conflict"), 90000, "the real conflict copy merged")
   ok(!readTime().includes("outside-conflict"), "the linked copy is not merged")
   await waitFor(() => readTime().includes("real-conflict"), 30000, "the real conflict copy merged")
-  await waitFor(() => !fs.existsSync(realCopy), 5000, "the real conflict copy cleared away")
+  await waitFor(() => !fs.existsSync(realCopy), 45000, "the real conflict copy cleared away (on the next pass)")
   ok(!readTime().includes("outside-conflict"), "the linked copy is not merged")
   ok(fs.existsSync(victim) && fs.lstatSync(copy).isSymbolicLink(), "the linked copy and its target are left alone")
 })
 
+// (A copy cleared away goes to the trash with gio, which refuses trashing in
+// /tmp, where these tests run, so here it is removed: not checked below.)
+
+test("a sync conflict copy is kept until its time entries are on disk", async () => {
+  await fresh()
+  await b.stop()
+  failWrites("linear-time.json")
+  const t = JSON.parse(fs.readFileSync(TIME, "utf8"))
+  t.entries = t.entries.concat([outsideEntry("only in the copy")])
+  const copy = path.join(SHARED, "linear-time.sync-conflict-20261119-090000-ABCDEFG.json")
+  fs.writeFileSync(copy, JSON.stringify(t))
+  // a merges the copy, but the time file cannot be written.
+  await waitFor(() => /Could not save the time file/.test(a.ev("m('notify').toast")), 90000, "the failed save")
+  await sleep(3000)
+  ok(!readTime().includes("only in the copy"), "the entry is not on disk (the write failed)")
+  ok(fs.existsSync(copy), "the copy, the only saved place of the entry, is kept")
+  // Writes work again: the entry is saved on a later pass, then the copy goes to the trash.
+  failWrites("")
+  await waitFor(() => readTime().includes("only in the copy"), 90000, "the entry saved once writes work")
+  await waitFor(() => !fs.existsSync(copy), 90000, "the copy cleared away once its entry is on disk")
+})
+
+test("a sync conflict copy of the settings is kept until its rules are on disk", async () => {
+  await fresh()
+  await b.stop()
+  failWrites("linear-board.json")
+  const other = readSettings()
+  other.recurring = [{ id: "rule-only-copy", issueId: "issue-2", teamId: "team-eng", teamName: "Engineering", title: "Only in the copy", every: "week", start: "2030-01-07" }]
+  const copy = path.join(SHARED, "linear-board.sync-conflict-20261119-090000-ABCDEFG.json")
+  fs.writeFileSync(copy, JSON.stringify(other))
+  await waitFor(() => /Could not save .*linear-board\.json/.test(a.ev("m('notify').toast")), 90000, "the failed save")
+  await sleep(3000)
+  ok(!(readSettings().recurring || []).some(r => r.id === "rule-only-copy"), "the rule is not on disk (the write failed)")
+  ok(fs.existsSync(copy), "the copy, the only saved place of the rule, is kept")
+  failWrites("")
+  await waitFor(() => (readSettings().recurring || []).some(r => r.id === "rule-only-copy"), 90000, "the rule saved once writes work")
+  await waitFor(() => !fs.existsSync(copy), 90000, "the copy cleared away once its rule is on disk")
+})
+
+test("a sync conflict copy is kept when the folder changes before its entries are on disk", async () => {
+  await fresh()
+  await b.stop()
+  failWrites("linear-time.json")
+  const t = JSON.parse(fs.readFileSync(TIME, "utf8"))
+  t.entries = t.entries.concat([outsideEntry("copy before the move")])
+  const copy = path.join(SHARED, "linear-time.sync-conflict-20261119-100000-ABCDEFG.json")
+  fs.writeFileSync(copy, JSON.stringify(t))
+  await waitFor(() => /Could not save the time file/.test(a.ev("m('notify').toast")), 90000, "the failed save")
+  // Settings → Data → another folder, before the merge reached the disk.
+  failWrites("")
+  const other = path.join(H.TMP, "shared-other")
+  fs.rmSync(other, { recursive: true, force: true })
+  fs.mkdirSync(other)
+  a.ev("m('setTimeLocation').setTimeLocation(" + JSON.stringify(other) + ")")
+  await waitFor(() => a.ev("m('setTimeLocation').timeLocation") === other && a.ev("m('setTimeLocation').timeWritable") &&
+    fs.existsSync(path.join(other, "linear-time.json")), 15000, "a to use the other folder")
+  await sleep(40000)   // more than one pass of the conflict check (every 30 s)
+  ok(fs.existsSync(copy), "the copy in the old folder is kept")
+  ok(!readTime().includes("copy before the move"), "the entry is still only in the copy")
+  // Back to the first folder: the copy is merged there, then cleared away.
+  a.ev("m('setTimeLocation').setTimeLocation(" + JSON.stringify(SHARED) + ")")
+  await waitFor(() => readTime().includes("copy before the move"), 90000, "the entry saved in the first folder")
+  await waitFor(() => !fs.existsSync(copy), 90000, "the copy cleared away once its entry is on disk")
+})
+
 async function main() {
   H.setup()
+  failWrites("")
+  fs.writeFileSync(path.join(H.BIN, "python3"), "#!/bin/bash\n" +
+    "# Test stub: a write of the file named in " + FAIL_WRITES + " fails like a full disk.\n" +
+    "fail=$(cat " + JSON.stringify(FAIL_WRITES) + " 2>/dev/null)\n" +
+    "if [ -n \"$fail\" ] && [ \"$3\" = write ] && [ \"$(basename -- \"${@: -1}\")\" = \"$fail\" ]; then cat >/dev/null; echo 'linear-file: No space left on device' >&2; exit 1; fi\n" +
+    "exec /usr/bin/python3 \"$@\"\n", { mode: 0o755 })
   await H.startServer()
   a = computer("a"); b = computer("b")
   let failed = 0, ran = 0

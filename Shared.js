@@ -93,7 +93,7 @@ function parseExport(text) {
 function mergeSettings(config, incoming) {
   var next = {}
   for (var k in config) next[k] = config[k]
-  var rules = 0, codes = 0
+  var rules = 0, codes = 0, hidden = 0
   if (incoming.recurring) {
     var have = {}
     ;(config.recurring || []).forEach(function(r) { have[r.id] = true })
@@ -108,12 +108,19 @@ function mergeSettings(config, incoming) {
     if (codes) next.projectCodes = pc
   }
   if (incoming.hidden) {
-    var hd = {}, more = false
+    var hd = {}
     for (var c in (config.hidden || {})) hd[c] = config.hidden[c]
-    for (var t in incoming.hidden) if (hd[t] === undefined) { hd[t] = incoming.hidden[t]; more = true }
-    if (more) next.hidden = hd
+    for (var t in incoming.hidden) if (hd[t] === undefined) { hd[t] = incoming.hidden[t]; hidden++ }
+    if (hidden) next.hidden = hd
   }
-  return { config: next, rules: rules, codes: codes }
+  return { config: next, rules: rules, codes: codes, hidden: hidden }
+}
+
+// True when config has everything mergeSettings would add from incoming: a
+// sync conflict copy that adds nothing to the file on disk can go.
+function covers(config, incoming) {
+  var m = mergeSettings(config, incoming)
+  return !m.rules && !m.codes && !m.hidden
 }
 
 // ---- copies Syncthing keeps when two computers changed a file at once ----
@@ -127,6 +134,6 @@ function conflictGlob(fileName) {
 
 if (typeof module !== "undefined") {
   module.exports = { VERSION: VERSION, FILE_NAME: FILE_NAME, KEYS: KEYS, clean: clean, pick: pick, serialize: serialize,
-    parse: parse, apply: apply, differs: differs, exportText: exportText, parseExport: parseExport, mergeSettings: mergeSettings,
+    parse: parse, apply: apply, differs: differs, exportText: exportText, parseExport: parseExport, mergeSettings: mergeSettings, covers: covers,
     conflictGlob: conflictGlob }
 }

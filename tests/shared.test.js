@@ -68,6 +68,15 @@ const none = S.mergeSettings(here, {})
 assert.strictEqual(none.rules + none.codes, 0)
 assert.ok(!S.differs(here, none.config))
 
+// A sync conflict copy of linear-board.json may go only when the file on disk
+// already has every recurring issue, project code and hidden status in it.
+const disk = { recurring: [rule], projectCodes: { p1: "WEB" }, hidden: { t1: ["s1"] } }
+assert.strictEqual(S.covers(disk, { recurring: [rule], projectCodes: { p1: "OTHER" }, hidden: { t1: ["s9"] }, layout: "list" }), true)
+assert.strictEqual(S.covers(disk, { recurring: [rule, { id: "r2", title: "New", teamId: "t1" }] }), false)
+assert.strictEqual(S.covers(disk, { projectCodes: { p2: "API" } }), false)
+assert.strictEqual(S.covers(disk, { hidden: { t2: ["s2"] } }), false)
+assert.strictEqual(S.covers({}, {}), true)
+
 // Syncthing's conflict copies of a file
 assert.strictEqual(S.conflictGlob("linear-time.json"), "linear-time.sync-conflict-*.json")
 assert.strictEqual(S.conflictGlob("linear-board.json"), "linear-board.sync-conflict-*.json")

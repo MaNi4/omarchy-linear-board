@@ -90,6 +90,11 @@ const m = T.merge({ entries: [list[0]], running: null }, { entries: [list[0], li
 assert.strictEqual(m.added, 1)
 assert.strictEqual(m.data.entries.length, 2)
 
+// A sync conflict copy may go only when the file on disk already has all of it.
+assert.strictEqual(T.covers({ entries: [list[0], list[1]], running: null }, { entries: [list[1]], running: null }), true)
+assert.strictEqual(T.covers({ entries: [list[0]], running: null }, { entries: [list[0], list[1]], running: null }), false)
+assert.strictEqual(T.covers({ entries: [], running: null }, { entries: [], running: null }), true)
+
 // comment text and manual start
 assert.ok(/^⏱ \*\*1h\*\* logged \(2026-10-27\)$/.test(T.commentBody({ ...list[0], manual: true })))
 assert.strictEqual(T.manualStart("2026-10-26").getHours(), 12)

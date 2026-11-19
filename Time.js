@@ -223,6 +223,12 @@ function merge(base, incoming) {
   }
 }
 
+// True when data has every entry of incoming: a sync conflict copy that
+// adds nothing to the file on disk can go.
+function covers(data, incoming) {
+  return merge(data, incoming).added === 0
+}
+
 // Text for the Linear comment about an entry.
 function commentBody(entry) {
   var s = new Date(entry.start), end = new Date(s.getTime() + entry.seconds * 1000)
@@ -252,7 +258,7 @@ function manualStart(dateText) {
 if (typeof module !== "undefined") {
   module.exports = {
     MIN_SECONDS: MIN_SECONDS, emptyData: emptyData, parse: parse, serialize: serialize, newId: newId, issueInfo: issueInfo,
-    entryFromRunning: entryFromRunning, parseDuration: parseDuration, formatDuration: formatDuration, formatClock: formatClock,
+    entryFromRunning: entryFromRunning, covers: covers, parseDuration: parseDuration, formatDuration: formatDuration, formatClock: formatClock,
     hours: hours, period: period, entriesIn: entriesIn, summarize: summarize, total: total, totalFor: totalFor,
     totalsByIssue: totalsByIssue, toCsv: toCsv, merge: merge, commentBody: commentBody, entryWhen: entryWhen,
     manualStart: manualStart, isoDate: isoDate

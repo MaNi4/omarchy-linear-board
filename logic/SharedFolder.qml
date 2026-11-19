@@ -95,10 +95,18 @@ Item {
   // syncing (one was offline), Syncthing keeps one version and puts the
   // other next to it as a .sync-conflict copy. Their time entries and
   // recurring rules / project codes are added to the file in use (nothing
-  // is removed), then the copy is deleted. A copy that cannot be read is
-  // left alone and reported once.
+  // is removed). Until they are on disk, the copy is the only saved place of
+  // them, and a save can still fail (full disk) or be dropped (folder
+  // changed), so the copy is never cleared away right after a merge: each
+  // pass reads the file in use from disk first, and only a copy that adds
+  // nothing to it goes to the trash. Otherwise the merge is saved and the
+  // copy stays for the next pass (every 30 s), which is also how a failed
+  // save is tried again; merging twice adds nothing twice. A copy that
+  // cannot be read is left alone and reported once.
   property var conflictQueue: []
   property var conflictReported: ({})
+  property var conflictNotified: ({})
+  property string conflictText: ""
   Timer {
     interval: 30000
     repeat: true
@@ -123,44 +131,74 @@ Item {
       conflictFile.path = found[0]
     }
   }
+  function isSettingsCopy(file) {
+    return file.substring(file.lastIndexOf("/") + 1).indexOf(Shared.FILE_NAME.replace(/\.json$/, "") + ".sync-conflict-") === 0
+  }
   // Links are not listed above, and not read here either if one appears in between.
   SharedFile {
     id: conflictFile
-    onLoaded: shared.mergeConflict(conflictFile.path, text())
-    onLoadFailed: function(why) { shared.nextConflict(false, why === "link" ? "it is a link" : "") }
+    onLoaded: {
+      // Then the file in use, fresh from disk: what the board holds may not be saved.
+      shared.conflictText = text()
+      var dest = shared.isSettingsCopy(conflictFile.path) ? shared.path : timeTracker.timeFilePath
+      if (!dest) { shared.nextConflict("keep"); return }
+      conflictDest.path = dest
+    }
+    onLoadFailed: function(why) { shared.nextConflict("report", why === "link" ? "it is a link" : "") }
   }
-  function mergeConflict(file, text) {
-    var isSettings = file.substring(file.lastIndexOf("/") + 1).indexOf(Shared.FILE_NAME.replace(/\.json$/, "") + ".sync-conflict-") === 0
+  SharedFile {
+    id: conflictDest
+    onLoaded: shared.mergeConflict(conflictFile.path, shared.conflictText, text())
+    // The file in use cannot be read: its own error is shown, the copy waits.
+    onLoadFailed: shared.nextConflict("keep")
+  }
+  function mergeConflict(file, text, diskText) {
+    var isSettings = shared.isSettingsCopy(file)
+    var copy = isSettings ? Shared.parse(text) : Time.parse(text)
+    if (copy.error) { shared.nextConflict("report", copy.error); return }
+    var disk = isSettings ? Shared.parse(diskText) : Time.parse(diskText)
+    if (disk.error) { shared.nextConflict("keep"); return }
+    if (isSettings ? Shared.covers(disk.data, copy.data) : Time.covers(disk.data, copy.data)) {
+      console.warn("linear-board: the sync conflict copy " + file + " adds nothing to the file in use; moved to the trash")
+      shared.nextConflict("trash")
+      return
+    }
+    // Not all on disk yet: merge it into what the board holds and save that.
     var said = ""
     if (isSettings) {
-      var r = Shared.parse(text)
-      if (r.error) { shared.nextConflict(false, r.error); return }
-      var s = Shared.mergeSettings(root.config, r.data)
+      var s = Shared.mergeSettings(root.config, copy.data)
       if (Shared.differs(root.config, s.config)) root.setConfig(s.config)
+      else shared.save()
       if (s.rules || s.codes) said = [s.rules ? s.rules + " recurring issue" + (s.rules === 1 ? "" : "s") : "", s.codes ? s.codes + " project code" + (s.codes === 1 ? "" : "s") : ""].filter(function(x) { return x }).join(", ")
     } else {
-      var t = Time.parse(text)
-      if (t.error) { shared.nextConflict(false, t.error); return }
-      var m = Time.merge(timeTracker.copyData(), t.data)
-      if (m.added) {
-        if (!timeTracker.saveTime(m.data)) { shared.nextConflict(false, "the time file cannot be written"); return }
-        said = m.added + " time " + (m.added === 1 ? "entry" : "entries")
-      }
+      var m = Time.merge(timeTracker.copyData(), copy.data)
+      if (!timeTracker.saveTime(m.data)) { shared.nextConflict("keep"); return }
+      if (m.added) said = m.added + " time " + (m.added === 1 ? "entry" : "entries")
     }
-    if (said) notices.notify("Merged from a sync conflict copy: " + said)
-    console.warn("linear-board: merged and removed the sync conflict copy " + file + (said ? " (" + said + ")" : " (nothing new)"))
-    shared.nextConflict(true)
+    if (said && !shared.conflictNotified[file]) {
+      var n = {}
+      for (var k in shared.conflictNotified) n[k] = shared.conflictNotified[k]
+      n[file] = true
+      shared.conflictNotified = n
+      notices.notify("Merged from a sync conflict copy: " + said)
+    }
+    console.warn("linear-board: merged the sync conflict copy " + file + (said ? " (" + said + ")" : "") + "; it stays until a later read of the file in use has all of it")
+    shared.nextConflict("keep")
   }
-  function nextConflict(merged, error) {
+  // action: "trash" (all of it is on disk), "keep" (look again on the next
+  // pass) or "report" (cannot be merged: left alone, said once).
+  function nextConflict(action, error) {
     var file = shared.conflictQueue[0]
-    if (merged) Quickshell.execDetached(["rm", "-f", "--", file])
-    else if (file) {
+    if (action === "trash" && file) Quickshell.execDetached(["sh", "-c", 'gio trash -- "$1" 2>/dev/null || rm -f -- "$1"', "sh", file])
+    else if (action === "report" && file) {
       var rep = {}
       for (var k in shared.conflictReported) rep[k] = shared.conflictReported[k]
       rep[file] = true
       shared.conflictReported = rep
       notices.notify("A sync conflict copy could not be merged" + (error ? " (" + error + ")" : "") + ": " + file.replace(root.home, "~"), true)
     }
+    shared.conflictText = ""
+    conflictDest.path = ""
     shared.conflictQueue = shared.conflictQueue.slice(1)
     if (shared.conflictQueue.length) conflictFile.path = shared.conflictQueue[0]
     else conflictFile.path = ""

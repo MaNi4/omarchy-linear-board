@@ -110,8 +110,10 @@ you sync with Syncthing. The board then keeps its time and settings files there:
 - If the files are missing (the sync isn't finished yet, or a drive isn't mounted), the board waits for them and keeps
   changes on this computer in the meantime.
 - If both computers changed something before they synced, Syncthing keeps a second copy with `sync-conflict` in its
-  name. The board merges that copy within 30 seconds, so no time entries or recurring issues are lost. An entry you
-  deleted on one computer can come back from the other computer's copy.
+  name. The board merges that copy within 30 seconds, so no time entries or recurring issues are lost. The copy goes
+  to the trash only once the file in use, read back from disk, has all of it, so a failed save (a full disk, say)
+  loses nothing: the copy stays and the merge is tried again. An entry you deleted on one computer can come back from
+  the other computer's copy.
 - A recurring issue is created only once, even when two computers create it at the same moment.
 
 Each computer keeps its own selected team, project and filters, its shortcuts and its API key.
