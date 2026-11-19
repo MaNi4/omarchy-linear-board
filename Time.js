@@ -223,10 +223,46 @@ function merge(base, incoming) {
   }
 }
 
-// True when data has every entry of incoming: a sync conflict copy that
-// adds nothing to the file on disk can go.
-function covers(data, incoming) {
-  return merge(data, incoming).added === 0
+// A sync conflict copy merged into the time file: its entries as in merge(),
+// and its running timer too (started on a computer that was offline, the
+// copy may be the only record of it). The file holds one running timer, so
+// with a different one there, it is as if the later of the two had been
+// started while the other ran: the later one runs on, the other is logged
+// until then (once: its entry starts when it started, which is how a logged
+// timer is recognised). Returns { data, added, timer }: timer is true when
+// the running timer changed.
+function mergeConflict(base, copy) {
+  var m = merge(base, copy)
+  var r = copy.running, now = base.running || null
+  m.data.running = now
+  if (!r || sameTimer(r, now) || timerLogged(m.data.entries, r)) return { data: m.data, added: m.added, timer: false }
+  if (!now) {
+    m.data.running = r
+    return { data: m.data, added: m.added, timer: true }
+  }
+  var copyLater = new Date(r.startedAt).getTime() > new Date(now.startedAt).getTime()
+  var stopped = copyLater ? now : r, runs = copyLater ? r : now
+  var e = entryFromRunning(stopped, new Date(runs.startedAt), "sync-" + stopped.issueId + "-" + stopped.startedAt, stopped.device)
+  var added = m.added
+  if (e.seconds >= MIN_SECONDS) { m.data.entries = m.data.entries.concat([e]); added++ }
+  m.data.running = runs
+  return { data: m.data, added: added, timer: copyLater }
+}
+
+function sameTimer(a, b) {
+  return !!(a && b && a.issueId === b.issueId && a.startedAt === b.startedAt)
+}
+
+function timerLogged(entries, r) {
+  var at = new Date(r.startedAt).getTime()
+  return entries.some(function(e) { return !e.manual && e.issueId === r.issueId && new Date(e.start).getTime() === at })
+}
+
+// True when the time file data has all of a sync conflict copy (entries and
+// running timer): a copy that adds nothing to the file on disk can go.
+function covers(data, copy) {
+  var m = mergeConflict(data, copy)
+  return m.added === 0 && !m.timer
 }
 
 // Text for the Linear comment about an entry.
@@ -258,7 +294,7 @@ function manualStart(dateText) {
 if (typeof module !== "undefined") {
   module.exports = {
     MIN_SECONDS: MIN_SECONDS, emptyData: emptyData, parse: parse, serialize: serialize, newId: newId, issueInfo: issueInfo,
-    entryFromRunning: entryFromRunning, covers: covers, parseDuration: parseDuration, formatDuration: formatDuration, formatClock: formatClock,
+    entryFromRunning: entryFromRunning, covers: covers, mergeConflict: mergeConflict, parseDuration: parseDuration, formatDuration: formatDuration, formatClock: formatClock,
     hours: hours, period: period, entriesIn: entriesIn, summarize: summarize, total: total, totalFor: totalFor,
     totalsByIssue: totalsByIssue, toCsv: toCsv, merge: merge, commentBody: commentBody, entryWhen: entryWhen,
     manualStart: manualStart, isoDate: isoDate

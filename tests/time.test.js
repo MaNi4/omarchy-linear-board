@@ -95,6 +95,39 @@ assert.strictEqual(T.covers({ entries: [list[0], list[1]], running: null }, { en
 assert.strictEqual(T.covers({ entries: [list[0]], running: null }, { entries: [list[0], list[1]], running: null }), false)
 assert.strictEqual(T.covers({ entries: [], running: null }, { entries: [], running: null }), true)
 
+// A running timer in a conflict copy (started on a computer that was offline)
+// is as much its content as the entries: never dropped.
+const timerAt = (issueId, iso) => ({ issueId, identifier: "E-" + issueId, title: "T " + issueId, startedAt: iso, device: "pc-" + issueId })
+const rc = timerAt("b", "2026-11-19T09:00:00.000Z"), rd = timerAt("c", "2026-11-19T09:30:00.000Z")
+const disk0 = { entries: [list[0]], running: null }
+// Nobody else runs a timer: the copy's timer runs on.
+assert.strictEqual(T.covers(disk0, { entries: [list[0]], running: rc }), false)
+const t1 = T.mergeConflict(disk0, { entries: [list[0]], running: rc })
+assert.deepStrictEqual(plain(t1.data.running), plain(rc))
+assert.strictEqual(t1.timer, true)
+assert.strictEqual(T.covers(t1.data, { entries: [list[0]], running: rc }), true)
+// The file has it as running, or already logged it (stopped since): nothing to add.
+assert.strictEqual(T.covers({ entries: [], running: rc }, { entries: [], running: rc }), true)
+const loggedRc = T.entryFromRunning(rc, new Date("2026-11-19T09:20:00.000Z"), "x1", "pc-b")
+assert.strictEqual(T.covers({ entries: [loggedRc], running: null }, { entries: [], running: rc }), true)
+// Two timers, one on each computer: as when a timer is started while one
+// runs, the one started later runs on and the other is logged until then.
+const t2 = T.mergeConflict({ entries: [], running: rd }, { entries: [], running: rc })
+assert.deepStrictEqual(plain(t2.data.running), plain(rd))
+assert.strictEqual(t2.data.entries.length, 1)
+assert.strictEqual(t2.data.entries[0].issueId, "b")
+assert.strictEqual(t2.data.entries[0].start, rc.startedAt)
+assert.strictEqual(t2.data.entries[0].seconds, 1800)
+assert.strictEqual(T.covers(t2.data, { entries: [], running: rc }), true)
+assert.strictEqual(T.covers(T.mergeConflict(t2.data, { entries: [], running: rc }).data, { entries: [], running: rc }), true)
+const t3 = T.mergeConflict({ entries: [], running: rc }, { entries: [], running: rd })
+assert.deepStrictEqual(plain(t3.data.running), plain(rd))
+assert.deepStrictEqual(plain(t3.data.entries.map(e => [e.issueId, e.seconds])), [["b", 1800]])
+assert.strictEqual(T.covers(t3.data, { entries: [], running: rd }), true)
+// Merged twice, logged once. A plain merge (import) keeps the file's timer as before.
+assert.deepStrictEqual(plain(T.merge({ entries: [], running: rc }, { entries: [], running: rd }).data.running), plain(rc))
+assert.strictEqual(T.mergeConflict(t3.data, { entries: [], running: rd }).data.entries.length, 1)
+
 // comment text and manual start
 assert.ok(/^⏱ \*\*1h\*\* logged \(2026-10-27\)$/.test(T.commentBody({ ...list[0], manual: true })))
 assert.strictEqual(T.manualStart("2026-10-26").getHours(), 12)

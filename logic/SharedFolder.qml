@@ -93,20 +93,25 @@ Item {
   // ---- conflict copies ----
   // When two computers changed the time file or linear-board.json before
   // syncing (one was offline), Syncthing keeps one version and puts the
-  // other next to it as a .sync-conflict copy. Their time entries and
-  // recurring rules / project codes are added to the file in use (nothing
-  // is removed). Until they are on disk, the copy is the only saved place of
-  // them, and a save can still fail (full disk) or be dropped (folder
-  // changed), so the copy is never cleared away right after a merge: each
-  // pass reads the file in use from disk first, and only a copy that adds
-  // nothing to it goes to the trash. Otherwise the merge is saved and the
-  // copy stays for the next pass (every 30 s), which is also how a failed
-  // save is tried again; merging twice adds nothing twice. A copy that
-  // cannot be read is left alone and reported once.
+  // other next to it as a .sync-conflict copy. Its time entries, running
+  // timer and recurring rules / project codes / hidden statuses are added to
+  // the file in use next to it (nothing is removed). Until they are on disk,
+  // the copy is the only saved place of them, so it is never cleared away
+  // right after a merge: each pass reads the file in use from disk, and only
+  // a copy that adds nothing to it goes to the trash. Otherwise what is on
+  // disk plus the copy is saved and the copy stays for the next pass (every
+  // 30 s), which also retries a failed save; merging twice adds nothing twice.
+  // What was read is acted on only while nothing changed since: the same
+  // folder (a copy is merged only into the file next to it) and no save of
+  // that file in between (it would hold changes the read lacks). Otherwise
+  // the copy waits for the next pass. A copy that cannot be read is left
+  // alone and reported once.
   property var conflictQueue: []
   property var conflictReported: ({})
   property var conflictNotified: ({})
+  property string conflictDir: ""      // the folder the queue was listed in
   property string conflictText: ""
+  property int conflictSeq: -1         // the file in use's save count when it was read
   Timer {
     interval: 30000
     repeat: true
@@ -117,6 +122,7 @@ Item {
   function findConflicts() {
     if (conflictFind.running || shared.conflictQueue.length || !privateFiles.sharedReal) return
     var timeName = timeTracker.timePath.substring(timeTracker.timePath.lastIndexOf("/") + 1)
+    shared.conflictDir = privateFiles.sharedReal
     conflictFind.command = ["sh", "-c", 'cd "$1" 2>/dev/null || exit 0; for f in $2 $3; do case "$f" in *"\n"*) continue;; esac; [ -f "$f" ] && [ ! -L "$f" ] && printf "%s\\n" "$PWD/$f"; done; exit 0',
       "sh", privateFiles.sharedReal, Shared.conflictGlob(timeName), Shared.conflictGlob(Shared.FILE_NAME)]
     conflictFind.running = true
@@ -125,6 +131,7 @@ Item {
     id: conflictFind
     stdout: StdioCollector { id: conflictList }
     onExited: {
+      if (privateFiles.sharedReal !== shared.conflictDir) return   // another folder by now
       var found = conflictList.text.split("\n").filter(function(f) { return f && !shared.conflictReported[f] })
       if (!found.length) return
       shared.conflictQueue = found
@@ -134,15 +141,25 @@ Item {
   function isSettingsCopy(file) {
     return file.substring(file.lastIndexOf("/") + 1).indexOf(Shared.FILE_NAME.replace(/\.json$/, "") + ".sync-conflict-") === 0
   }
+  // The file in use a copy is merged into, { path, view }, or null when it
+  // is not next to the copy any more (the folder was changed).
+  function conflictTarget(file) {
+    var settings = shared.isSettingsCopy(file)
+    var p = settings ? shared.path : timeTracker.timeFilePath
+    var dir = file.substring(0, file.lastIndexOf("/"))
+    if (!p || !shared.conflictDir || dir !== shared.conflictDir || privateFiles.sharedReal !== shared.conflictDir || p.substring(0, p.lastIndexOf("/")) !== dir) return null
+    return { path: p, view: settings ? sharedFile : timeTracker.timeFile }
+  }
   // Links are not listed above, and not read here either if one appears in between.
   SharedFile {
     id: conflictFile
     onLoaded: {
       // Then the file in use, fresh from disk: what the board holds may not be saved.
+      var target = shared.conflictTarget(conflictFile.path)
+      if (!target || target.view.writing) { shared.nextConflict("keep"); return }
       shared.conflictText = text()
-      var dest = shared.isSettingsCopy(conflictFile.path) ? shared.path : timeTracker.timeFilePath
-      if (!dest) { shared.nextConflict("keep"); return }
-      conflictDest.path = dest
+      shared.conflictSeq = target.view.seq
+      conflictDest.path = target.path
     }
     onLoadFailed: function(why) { shared.nextConflict("report", why === "link" ? "it is a link" : "") }
   }
@@ -153,6 +170,9 @@ Item {
     onLoadFailed: shared.nextConflict("keep")
   }
   function mergeConflict(file, text, diskText) {
+    // Still the same folder, and no save since the read: else the next pass.
+    var target = shared.conflictTarget(file)
+    if (!target || target.path !== conflictDest.path || target.view.seq !== shared.conflictSeq || target.view.writing) { shared.nextConflict("keep"); return }
     var isSettings = shared.isSettingsCopy(file)
     var copy = isSettings ? Shared.parse(text) : Time.parse(text)
     if (copy.error) { shared.nextConflict("report", copy.error); return }
@@ -163,17 +183,20 @@ Item {
       shared.nextConflict("trash")
       return
     }
-    // Not all on disk yet: merge it into what the board holds and save that.
+    // Not all on disk yet: what is on disk (it may hold more than the board
+    // read so far) plus the copy is saved.
     var said = ""
     if (isSettings) {
-      var s = Shared.mergeSettings(root.config, copy.data)
+      var base = Shared.apply(root.config, disk.data)
+      if (Shared.differs(root.config, base)) root.applySharedConfig(base)
+      var s = Shared.mergeSettings(base, copy.data)
       if (Shared.differs(root.config, s.config)) root.setConfig(s.config)
       else shared.save()
       if (s.rules || s.codes) said = [s.rules ? s.rules + " recurring issue" + (s.rules === 1 ? "" : "s") : "", s.codes ? s.codes + " project code" + (s.codes === 1 ? "" : "s") : ""].filter(function(x) { return x }).join(", ")
     } else {
-      var m = Time.merge(timeTracker.copyData(), copy.data)
+      var m = Time.mergeConflict(disk.data, copy.data)
       if (!timeTracker.saveTime(m.data)) { shared.nextConflict("keep"); return }
-      if (m.added) said = m.added + " time " + (m.added === 1 ? "entry" : "entries")
+      said = [m.added ? m.added + " time " + (m.added === 1 ? "entry" : "entries") : "", m.timer ? "the running timer" : ""].filter(function(x) { return x }).join(", ")
     }
     if (said && !shared.conflictNotified[file]) {
       var n = {}
@@ -198,6 +221,7 @@ Item {
       notices.notify("A sync conflict copy could not be merged" + (error ? " (" + error + ")" : "") + ": " + file.replace(root.home, "~"), true)
     }
     shared.conflictText = ""
+    shared.conflictSeq = -1
     conflictDest.path = ""
     shared.conflictQueue = shared.conflictQueue.slice(1)
     if (shared.conflictQueue.length) conflictFile.path = shared.conflictQueue[0]

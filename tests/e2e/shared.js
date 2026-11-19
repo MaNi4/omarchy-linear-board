@@ -64,13 +64,17 @@ function computer(name) {
 // write of the file named here fail. "" puts writes back to normal.
 const FAIL_WRITES = path.join(H.TMP, "fail-writes")
 const failWrites = name => fs.writeFileSync(FAIL_WRITES, name)
+// Reads of sync conflict copies take this many seconds (0: normal), to
+// change things while the board is in the middle of a pass.
+const SLOW_READS = path.join(H.TMP, "slow-reads")
+const slowReads = seconds => fs.writeFileSync(SLOW_READS, String(seconds))
 
 const readTime = () => JSON.parse(fs.readFileSync(TIME, "utf8")).entries.map(e => e.note).sort()
 const readSettings = () => JSON.parse(fs.readFileSync(SETTINGS, "utf8"))
 
 let a, b
 async function fresh(config) {
-  failWrites("")
+  failWrites(""); slowReads(0)
   await ctl("reset")
   await a.stop(); await b.stop()
   fs.rmSync(SHARED, { recursive: true, force: true })
@@ -363,13 +367,102 @@ test("a sync conflict copy is kept when the folder changes before its entries ar
   await waitFor(() => !fs.existsSync(copy), 90000, "the copy cleared away once its entry is on disk")
 })
 
+const readRunning = () => JSON.parse(fs.readFileSync(TIME, "utf8")).running
+
+test("a sync conflict copy whose only news is a running timer is not dropped", async () => {
+  await fresh()
+  await b.stop()
+  // b started a timer while offline; Syncthing kept a's version.
+  const t = JSON.parse(fs.readFileSync(TIME, "utf8"))
+  const startedAt = new Date(Date.now() - 10 * 60000).toISOString()
+  t.running = { issueId: "issue-2", identifier: "ENG-2", title: "Add dark mode toggle", startedAt, device: "pc-b" }
+  const copy = path.join(SHARED, "linear-time.sync-conflict-20261119-110000-ABCDEFG.json")
+  fs.writeFileSync(copy, JSON.stringify(t))
+  await waitFor(() => !fs.existsSync(copy) || (readRunning() || {}).startedAt === startedAt, 90000, "the copy merged or cleared away")
+  await sleep(1000)
+  eq((readRunning() || {}).startedAt, startedAt, "the copy's running timer is in the time file")
+  await waitFor(() => !fs.existsSync(copy), 90000, "the copy cleared away once its timer is on disk")
+  eq(a.ev("m('saveTime').timeData.running ? m('saveTime').timeData.running.startedAt : ''"), startedAt, "a runs the timer")
+})
+
+test("a sync conflict merge does not write over what synced in since the last read", async () => {
+  await fresh()
+  await b.stop()
+  failWrites("linear-time.json")
+  const t = JSON.parse(fs.readFileSync(TIME, "utf8"))
+  t.entries = t.entries.concat([outsideEntry("in the copy")])
+  const copy = path.join(SHARED, "linear-time.sync-conflict-20261119-120000-ABCDEFG.json")
+  fs.writeFileSync(copy, JSON.stringify(t))
+  await waitFor(() => /Could not save the time file/.test(a.ev("m('notify').toast")), 90000, "the failed save")
+  // Writes work again, and an entry from another computer syncs in right
+  // before the next pass, before a's next read of the time file.
+  failWrites("")
+  const now = JSON.parse(fs.readFileSync(TIME, "utf8"))
+  now.entries = now.entries.concat([outsideEntry("synced in")])
+  fs.writeFileSync(TIME, JSON.stringify(now))
+  a.ev("m('findConflicts').findConflicts()")
+  await waitFor(() => readTime().includes("in the copy"), 90000, "the copy's entry saved")
+  ok(readTime().includes("synced in"), "the entry that synced in is still there")
+  await waitFor(() => !fs.existsSync(copy), 90000, "the copy cleared away")
+  ok(readTime().includes("synced in"), "the entry that synced in is still there")
+})
+
+test("a settings conflict merge does not write over rules that synced in since the last read", async () => {
+  await fresh()
+  await b.stop()
+  failWrites("linear-board.json")
+  const rule = (id, title) => ({ id, issueId: "issue-2", teamId: "team-eng", teamName: "Engineering", title, every: "week", start: "2030-01-07" })
+  const other = readSettings()
+  other.recurring = [rule("rule-in-copy", "In the copy")]
+  const copy = path.join(SHARED, "linear-board.sync-conflict-20261119-140000-ABCDEFG.json")
+  fs.writeFileSync(copy, JSON.stringify(other))
+  await waitFor(() => /Could not save .*linear-board\.json/.test(a.ev("m('notify').toast")), 90000, "the failed save")
+  failWrites("")
+  const now = readSettings()
+  now.recurring = (now.recurring || []).concat([rule("rule-synced-in", "Synced in")])
+  fs.writeFileSync(SETTINGS, JSON.stringify(now))
+  a.ev("m('findConflicts').findConflicts()")
+  const ids = () => (readSettings().recurring || []).map(r => r.id)
+  await waitFor(() => ids().includes("rule-in-copy"), 90000, "the copy's rule saved")
+  ok(ids().includes("rule-synced-in"), "the rule that synced in is still there")
+  await waitFor(() => !fs.existsSync(copy), 90000, "the copy cleared away")
+  ok(ids().includes("rule-synced-in"), "the rule that synced in is still there")
+})
+
+test("a folder change during a pass leaves the old folder's conflict copy alone", async () => {
+  await fresh()
+  await b.stop()
+  // Another folder whose time file already has the copy's entry: compared
+  // with it, the copy would look merged.
+  const other = path.join(H.TMP, "shared-other")
+  fs.rmSync(other, { recursive: true, force: true })
+  fs.mkdirSync(other)
+  const t = JSON.parse(fs.readFileSync(TIME, "utf8"))
+  t.entries = t.entries.concat([outsideEntry("old folder only")])
+  fs.writeFileSync(path.join(other, "linear-time.json"), JSON.stringify(t))
+  fs.copyFileSync(SETTINGS, path.join(other, "linear-board.json"))
+  slowReads(6)
+  const copy = path.join(SHARED, "linear-time.sync-conflict-20261119-130000-ABCDEFG.json")
+  fs.writeFileSync(copy, JSON.stringify(t))
+  a.ev("m('findConflicts').findConflicts()")
+  await sleep(1500)   // the pass is reading the copy
+  a.ev("m('setTimeLocation').setTimeLocation(" + JSON.stringify(other) + ")")
+  await waitFor(() => a.ev("m('setTimeLocation').timeFilePath") === fs.realpathSync(other) + "/linear-time.json", 5000, "a to use the other folder")
+  await sleep(10000)  // the read is done, and whatever the pass does with it
+  slowReads(0)
+  ok(fs.existsSync(copy), "the old folder's copy is kept: its entry is not in the old folder's time file")
+  ok(!readTime().includes("old folder only"), "the old folder's time file is unchanged")
+})
+
 async function main() {
   H.setup()
-  failWrites("")
+  failWrites(""); slowReads(0)
   fs.writeFileSync(path.join(H.BIN, "python3"), "#!/bin/bash\n" +
     "# Test stub: a write of the file named in " + FAIL_WRITES + " fails like a full disk.\n" +
     "fail=$(cat " + JSON.stringify(FAIL_WRITES) + " 2>/dev/null)\n" +
     "if [ -n \"$fail\" ] && [ \"$3\" = write ] && [ \"$(basename -- \"${@: -1}\")\" = \"$fail\" ]; then cat >/dev/null; echo 'linear-file: No space left on device' >&2; exit 1; fi\n" +
+    "slow=$(cat " + JSON.stringify(SLOW_READS) + " 2>/dev/null)\n" +
+    "if [ \"${slow:-0}\" != 0 ] && [ \"$3\" = read ] && [[ \"${@: -1}\" == *.sync-conflict-* ]]; then sleep \"$slow\"; fi\n" +
     "exec /usr/bin/python3 \"$@\"\n", { mode: 0o755 })
   await H.startServer()
   a = computer("a"); b = computer("b")

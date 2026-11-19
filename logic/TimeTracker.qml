@@ -30,6 +30,7 @@ Item {
   readonly property var reportGroups: Time.summarize(timeTracker.reportEntries, timeTracker.reportBy)
   visible: false
   property alias timeLocationFile: timeLocationFile
+  property alias timeFile: timeFile
 
   // ---- time tracking -------------------------------------------------------------------
   // Entries are kept in a JSON file: by default in the data folder, or in a

@@ -14,6 +14,7 @@ import QtQuick
 //   loaded()            text() has the content
 //   loadFailed(why)     "missing", "link", "other" (not a regular file) or "error"
 //   saveFailed(error)
+//   seq, writing        bumped by every save / a save queued or running
 // Part of the Linear board (mani4.linear-board); PrivateFiles.write() calls
 // setText() on it directly (every save is a new 0600 file already).
 Item {
@@ -36,6 +37,8 @@ Item {
   property int seq: 0
   property bool readAgain: false
   property var pending: null          // { path, text }: the newest text still to write
+  // A save is queued or running: what is on disk is about to change.
+  readonly property bool writing: writer.running || !!file.pending
 
   onPathChanged: {
     file.content = ""
